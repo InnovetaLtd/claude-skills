@@ -11,6 +11,8 @@
 
 - **Deploy from the session, with the right gate.** <Describe the deploy command/target.> Confirm before deploying **app code** (each deploy is live). **Auto-deploy SAFE updates without asking:** a commit touching **only** docs and/or tests cannot change production behaviour, so once the test suite is green and CI passes, ship it without a separate confirmation. Any change touching app code still needs explicit go-ahead. When in doubt, treat it as app code and confirm.
 
+- **Capture the deploy process once it's repeatable (`deploy-init`).** When a project starts deploying and has no `## Deploy` block in CLAUDE.md yet, wire one up via `deploy-init` before deploying becomes routine — so every deploy thereafter runs through `/deploy` with the test + CI hard-gates and the safe-vs-app-code rule, instead of ad-hoc. Don't do it pre-first-deploy (nothing reliable to capture yet); do it once the deploy is understood and the next one would be boring. The block is living config — add gotchas as they surface.
+
 - **Fan out parallel subagents for read-only work, without asking.** For zero-conflict, read-heavy work — codebase research, multi-file audits, spec-writing, independent investigations — proactively launch parallel agents to move faster. **Keep BUILDS that edit shared files serial** (at most one feature build at a time on a shared module) to avoid merge conflicts. Don't ask permission to parallelise read-only work; do ask before spinning up many build agents (cost + review load).
 
 - **Batch small changes; serialise big ones (the throughput model).** Organise the build queue into tracks:
