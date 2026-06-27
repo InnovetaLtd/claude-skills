@@ -1,0 +1,14 @@
+{
+  "name": "innoveta-method",
+  "owner": {
+    "name": "Innoveta",
+    "email": "ben@innoveta.co.uk"
+  },
+  "plugins": [
+    {
+      "name": "innoveta-method",
+      "source": "./",
+      "description": "Innoveta's project-records methodology: tiered docs (CLAUDE.md + PROJECT_STATUS / ROADMAP / HISTORY), cold-start session handoffs, and a parallel-safe ideas capture/triage workflow."
+    }
+  ]
+}
