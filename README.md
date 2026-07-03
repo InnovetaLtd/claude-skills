@@ -60,14 +60,40 @@ Deploy targets differ per project, so the `deploy` skill ships the reusable *dis
 
 ## Install
 
-This is a plugin in a git repo. On any machine, add it as a plugin marketplace and install (run these in an interactive `claude` terminal):
+This repo is both the plugin and its marketplace (`.claude-plugin/marketplace.json` + `.claude-plugin/plugin.json` at the root). Two ways to get the skills into a project:
+
+### One-off, per machine
 
 ```
-/plugin marketplace add C:\dev\innoveta-method      # or the git URL once pushed
+/plugin marketplace add innovetaltd/innoveta-method
 /plugin install innoveta-method@innoveta-method
 ```
 
-The four skills then become available in every project on that machine — invoke them with `/project-records-init`, `/session-wrap`, `/ideas`, `/ideas-triage`, or let the agent trigger them from their descriptions.
+The six skills then become available in every project on that machine — invoke them with `/project-records-init`, `/session-wrap`, `/ideas`, `/ideas-triage`, `/deploy-init`, `/deploy`, or let the agent trigger them from their descriptions.
+
+### Auto-enabled per project (recommended for team repos, incl. Claude Code on the web)
+
+Commit this to a project's `.claude/settings.json` so anyone who opens the repo in Claude Code — locally or in a cloud session — gets prompted to install the marketplace and plugin automatically, with no manual `/plugin` step:
+
+```json
+{
+  "extraKnownMarketplaces": {
+    "innoveta-method": {
+      "source": {
+        "source": "github",
+        "repo": "innovetaltd/innoveta-method"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "innoveta-method@innoveta-method": true
+  }
+}
+```
+
+A ready-to-copy version of this snippet lives at [`templates/claude-settings-plugin.json`](templates/claude-settings-plugin.json) — merge its `extraKnownMarketplaces`/`enabledPlugins` keys into the project's existing `.claude/settings.json` rather than overwriting the file.
+
+This keeps every project pointed at the **same** copy of the skills — updates land here once, in `innoveta-method`, and every project picks them up on its next marketplace refresh, instead of drifting into per-repo forks.
 
 ## Use, per project
 

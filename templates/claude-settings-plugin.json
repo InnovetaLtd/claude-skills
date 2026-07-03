@@ -1,0 +1,13 @@
+{
+  "extraKnownMarketplaces": {
+    "innoveta-method": {
+      "source": {
+        "source": "github",
+        "repo": "innovetaltd/innoveta-method"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "innoveta-method@innoveta-method": true
+  }
+}
