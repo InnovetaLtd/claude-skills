@@ -29,6 +29,14 @@ The resulting settings look like this:
 
 Locally, the first time a repo is opened Claude Code asks you to trust it and install the plugins. That is once per repo per machine.
 
+**Cloud sessions do not install plugins from a repo's settings** (tested 2026-10-26: the session started with none installed). For those, add this one line to the cloud environment's setup script (environment menu in the session title bar → Edit → Setup script). It installs everything in `default-plugins.txt` before Claude starts, for every repo in that environment, and never fails the session:
+
+```bash
+git clone -q --depth 1 https://github.com/InnovetaLtd/claude-skills /tmp/claude-skills && bash /tmp/claude-skills/scripts/install-user.sh
+```
+
+The same script works on a fresh local machine if you want the plugins everywhere, not just in wired repos.
+
 ## Wiring a project
 
 Run from a clone of this repo, pointing at one or more project repos (defaults to the current directory):
