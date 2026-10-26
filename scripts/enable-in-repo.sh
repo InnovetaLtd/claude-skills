@@ -21,6 +21,11 @@ for repo in "$@"; do
     grep -vE '^\s*(#|$)' "$PLUGIN_LIST" | while read -r plugin; do
       claude plugin install "$plugin" --scope project
     done
+    # Same plugin enabled from another marketplace would load twice: flag it.
+    grep -vE '^\s*(#|$)' "$PLUGIN_LIST" | while read -r plugin; do
+      grep -oE "\"${plugin%@*}@[^\"]+\"" .claude/settings.json | grep -v "\"$plugin\"" \
+        | sed 's/^/   WARNING: duplicate, remove from .claude\/settings.json: /' || true
+    done
     echo "   done: review and commit .claude/settings.json"
   )
 done

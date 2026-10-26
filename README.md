@@ -41,7 +41,7 @@ scripts/enable-in-repo.sh ~/dev/egb-buildmanager ~/dev/egb-serviceapp
 scripts\enable-in-repo.ps1 C:\dev\egb-buildmanager, C:\dev\egb-serviceapp
 ```
 
-The script uses the Claude Code CLI to merge the marketplace and plugins into each repo's `.claude/settings.json`, keeping any existing settings. It does not commit, so review the diff and commit it yourself.
+The script uses the Claude Code CLI to merge the marketplace and plugins into each repo's `.claude/settings.json`, keeping any existing settings. It does not commit, so review the diff and commit it yourself. If a repo already enables one of these plugins from another marketplace (for example `impeccable@impeccable` from upstream), the script prints a `WARNING: duplicate` line. Delete that entry, and its `extraKnownMarketplaces` declaration, so the plugin doesn't load twice.
 
 The plugins it enables are listed once, in [`default-plugins.txt`](default-plugins.txt). A project that doesn't need one can set it to `false` in its own settings.
 
