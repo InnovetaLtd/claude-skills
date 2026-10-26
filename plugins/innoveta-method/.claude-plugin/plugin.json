@@ -1,6 +1,6 @@
 {
   "name": "innoveta-method",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Innoveta's project-records methodology for AI-maintained codebases: tiered docs (CLAUDE.md + PROJECT_STATUS / ROADMAP / HISTORY), cold-start session handoffs, and a parallel-safe ideas capture/triage workflow.",
   "author": {
     "name": "Innoveta",

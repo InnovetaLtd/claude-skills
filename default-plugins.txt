@@ -1,0 +1,5 @@
+# Plugins enabled in every project by scripts/enable-in-repo.*
+# One <plugin>@<marketplace> per line. Lines starting with # are ignored.
+innoveta-method@innoveta
+impeccable@innoveta
+mattpocock-skills@innoveta

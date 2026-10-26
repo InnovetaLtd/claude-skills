@@ -1,14 +1,42 @@
 {
-  "name": "innoveta-method",
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "innoveta",
   "owner": {
     "name": "Innoveta",
     "email": "ben@innoveta.co.uk"
   },
+  "metadata": {
+    "description": "Innoveta's single source of truth for Claude Code skills: the Innoveta Method plus pinned third-party skill sets."
+  },
   "plugins": [
     {
       "name": "innoveta-method",
-      "source": "./",
-      "description": "Innoveta's project-records methodology: tiered docs (CLAUDE.md + PROJECT_STATUS / ROADMAP / HISTORY), cold-start session handoffs, and a parallel-safe ideas capture/triage workflow."
+      "source": "./plugins/innoveta-method",
+      "description": "Innoveta's project-records methodology: tiered docs (CLAUDE.md + PROJECT_STATUS / ROADMAP / HISTORY), cold-start session handoffs, a parallel-safe ideas capture/triage workflow, and config-driven gated deploys.",
+      "category": "workflow"
+    },
+    {
+      "name": "impeccable",
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/pbakaus/impeccable.git",
+        "path": "plugin",
+        "ref": "skill-v4.7.0"
+      },
+      "description": "Paul Bakaus's frontend design fluency: /impeccable polish, audit, critique and anti-pattern detection. Pinned upstream — bump the ref to upgrade.",
+      "category": "design",
+      "homepage": "https://impeccable.style"
+    },
+    {
+      "name": "mattpocock-skills",
+      "source": {
+        "source": "github",
+        "repo": "mattpocock/skills",
+        "sha": "5beb35b040e3de97e54fa9e386d7e42d15c295c2"
+      },
+      "description": "Matt Pocock's engineering skills: grilling, TDD, code review, domain modelling, diagnosing bugs and more. Pinned upstream — bump the sha to upgrade.",
+      "category": "engineering",
+      "homepage": "https://github.com/mattpocock/skills"
     }
   ]
 }

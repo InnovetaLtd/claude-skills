@@ -1,81 +1,55 @@
-# Innoveta Method
+# Innoveta Claude Skills
 
-A Claude Code plugin packaging Innoveta's **operating system for AI-maintained codebases** — the documentation and session discipline that keeps a project's context lean, its handoffs cold-start-proof, and parallel work conflict-free.
+The single source of truth for the Claude Code skills Innoveta uses across every project, on every machine and in every cloud session. It is a Claude Code **plugin marketplace**: one repo, installed the same way everywhere.
 
-*Private internal toolkit. Install it into any project you maintain through Claude Code.*
-
----
-
-## Why this exists
-
-When a codebase is maintained by an AI agent across many short-lived sessions, the binding constraint isn't compute or file size — it's **context and continuity**. Each session starts cold: it sees only what was written down, not the conversation that produced it. Two failure modes follow:
-
-1. **`CLAUDE.md` bloat.** Everything important gets dumped into the one file that's loaded every session, until it's thousands of lines and every turn pays for dead weight.
-2. **Lossy handoffs.** A session ends, the next one starts blind, and re-derives (or contradicts) decisions already made — worst of all, it trusts a stale "deployed" when something was only committed.
-
-This plugin encodes the fixes as **skills the agent invokes automatically**, plus templates to scaffold a new project in one pass.
-
-## The three core ideas
-
-**1. Tier documents by lifespan.** Don't keep one big file — keep four, each with a different write rhythm:
-
-| File | Holds | Rhythm |
+| Plugin | What it is | Source |
 |---|---|---|
-| `CLAUDE.md` | Durable instruction: working prefs, build queue, architecture, gotchas, roadmap **index** | Loaded every session — kept lean on purpose |
-| `PROJECT_STATUS.md` | The current snapshot: what's live, deploy state, what's next | Refreshed/overwritten in place |
-| `ROADMAP.md` | Full scope/design per numbered item | Appended/expanded per item |
-| `HISTORY.md` | Append-only "what shipped + why + files + deploy" log | Newest entry on top, never rewritten |
+| `innoveta-method` | Innoveta's project-records methodology: tiered docs, cold-start session handoffs, parallel-safe ideas capture/triage, config-driven gated deploys. See [its README](plugins/innoveta-method/README.md). | This repo, `plugins/innoveta-method/` |
+| `impeccable` | Paul Bakaus's frontend design skill, agents and hooks (`/impeccable polish`, `audit`, `critique`…). | [`pbakaus/impeccable`](https://github.com/pbakaus/impeccable), pinned to a release tag |
+| `mattpocock-skills` | Matt Pocock's engineering skills (grilling, TDD, code review, domain modelling, diagnosing bugs…). | [`mattpocock/skills`](https://github.com/mattpocock/skills), pinned to a commit |
 
-A short `## Project records` block at the top of `CLAUDE.md` *declares* which tiers a project uses — that block is the **contract** the skills route off. Tier to the project's size; a small utility might keep only `CLAUDE.md`.
+## How skills reach a session
 
-**2. Make handoffs cold-start-proof.** Before any session that's about to end (or be `/clear`ed), bring the records fully current — grounded in `git`, not memory — and **explicitly confirm they're current before suggesting a restart**. Accuracy over tidiness: report what's actually true, including failures, unverified steps, and "committed but not deployed".
+Every project repo carries a small `.claude/settings.json` that names this marketplace and the plugins to enable. Because the setting travels with the repo, it works identically wherever the repo is opened: a local clone, the desktop app, an IDE, or a Claude Code cloud session. Nothing has to be installed per machine.
 
-**3. Separate write lanes so sessions never collide.** You can run a second "ideas / discussion" session *alongside* a live coding session, because they write to **disjoint files**: the discussion session only appends to a dated capture file under `ideas/`; triage only writes the durable records — and only in the coding session, when no discussion session is live. Two non-overlapping write lanes ⇒ zero edit conflicts on `CLAUDE.md`.
+The resulting settings look like this:
 
-The throughline: **the bottleneck is review bandwidth and continuity, not file size or compute.** Every convention here optimises for that.
-
-## What's in the box
-
-```
-skills/
-  project-records-init/   Scaffold or migrate a project onto the tiered docs
-  session-wrap/           Cold-start-proof end-of-session handoff
-  ideas/                  Parallel-safe idea capture (one dated file, no shared edits)
-  ideas-triage/           Promote/park/drop captured ideas into the records
-  deploy/                 Gated production deploy, driven by a per-project `## Deploy` block
-  deploy-init/            Capture an understood deploy process into that `## Deploy` block
-templates/
-  project-records-block.md   The `## Project records` contract block for CLAUDE.md
-  PROJECT_STATUS.md / ROADMAP.md / HISTORY.md   Tier headers
-  ideas-README.md / IDEAS_INBOX.md              The ideas convention + board
-  deploy-block.md            The `## Deploy` contract block for CLAUDE.md
-  working-preferences.md     Reusable Innoveta operating doctrines (edit per project)
+```json
+{
+  "extraKnownMarketplaces": {
+    "innoveta": { "source": { "source": "github", "repo": "InnovetaLtd/claude-skills" } }
+  },
+  "enabledPlugins": {
+    "innoveta-method@innoveta": true,
+    "impeccable@innoveta": true,
+    "mattpocock-skills@innoveta": true
+  }
+}
 ```
 
-### Deploy is config-driven, not hardcoded
+Locally, the first time a repo is opened Claude Code asks you to trust it and install the plugins. That is once per repo per machine.
 
-Deploy targets differ per project, so the `deploy` skill ships the reusable *discipline* — diff what's shipping, **hard-gate on green tests + green CI**, classify docs/tests-only (auto) vs app code (confirm), deploy, verify live, record state — and reads the per-project *knobs* (commands, health signal, gotchas) from a **`## Deploy` block in `CLAUDE.md`**. That's the "in-app config over hardcoding" doctrine applied to the toolkit itself: specifics live in data, not code.
+## Wiring a project
 
-`deploy-init` writes that block once the deploy is **understood and repeating** (after the first one or few manual deploys — not on day one, when the gotchas aren't known yet). And `deploy` does **gap-detection**: if a project has no `## Deploy` block, it stops and routes to `deploy-init` rather than improvising a production push — so the high-frequency "deploy" trigger reliably pulls in the harder-to-time setup step.
+Run from a clone of this repo, pointing at one or more project repos (defaults to the current directory):
 
-## Install
-
-This is a plugin in a git repo. On any machine, add it as a plugin marketplace and install (run these in an interactive `claude` terminal):
-
-```
-/plugin marketplace add C:\dev\innoveta-method      # or the git URL once pushed
-/plugin install innoveta-method@innoveta-method
+```bash
+scripts/enable-in-repo.sh ~/dev/egb-buildmanager ~/dev/egb-serviceapp
 ```
 
-The four skills then become available in every project on that machine — invoke them with `/project-records-init`, `/session-wrap`, `/ideas`, `/ideas-triage`, or let the agent trigger them from their descriptions.
+```powershell
+scripts\enable-in-repo.ps1 C:\dev\egb-buildmanager, C:\dev\egb-serviceapp
+```
 
-## Use, per project
+The script uses the Claude Code CLI to merge the marketplace and plugins into each repo's `.claude/settings.json`, keeping any existing settings. It does not commit, so review the diff and commit it yourself.
 
-1. **New project:** run `/project-records-init` — it assesses maturity, proposes a tier set, creates the files, and writes the `## Project records` block. (Run the built-in `/init` first if there's no `CLAUDE.md` yet.)
-2. **As you work:** when context gets long or you're about to start fresh, run `/session-wrap` — it updates the records and confirms they're current before recommending a restart.
-3. **Thinking, not building:** start a second session and run `/ideas` to capture ideas safely alongside live coding. Later, in the coding session, run `/ideas-triage` to fold them into the roadmap/queue.
-4. **Once deploys are routine:** run `/deploy-init` to capture the process into a `## Deploy` block, then ship with `/deploy` (tests → CI → deploy → verify, with the safe-vs-app-code rule). Until that block exists, `/deploy` will route you to `/deploy-init` first.
+The plugins it enables are listed once, in [`default-plugins.txt`](default-plugins.txt). A project that doesn't need one can set it to `false` in its own settings.
 
-## Status
+## Maintaining
 
-`v0.2.0` — the four records/ideas skills are production-proven; `deploy` + `deploy-init` are new (config-driven, gap-detection handoff); templates and this README are first-draft. Triggering relies on each skill's description (model-invoked — no manual call required), with the high-frequency `deploy` skill routing into the harder-to-time `deploy-init`. A deterministic hooks layer (fire on an actual `git push`) is a possible future add only where a missed trigger would be costly.
+- **Edit an Innoveta skill:** change it under `plugins/innoveta-method/`, then bump `version` in `plugins/innoveta-method/.claude-plugin/plugin.json` so installed copies pick up the change.
+- **Upgrade a third-party plugin:** change its `ref` (impeccable) or `sha` (Matt Pocock) in [`.claude-plugin/marketplace.json`](.claude-plugin/marketplace.json). Pinning means upstream changes never alter your skills until you choose to take them.
+- **Add a plugin:** add an entry to `.claude-plugin/marketplace.json` and a line to `default-plugins.txt`, then re-run the script on your repos.
+- **Validate before pushing:** `claude plugin validate .`
+
+Install each plugin through this marketplace only. If the same skills are also enabled through the claude.ai plugin directory, every skill appears twice, so disable the claude.ai copy.
