@@ -44,6 +44,13 @@ skills/
   ideas-triage/           Promote/park/drop captured ideas into the records
   deploy/                 Gated production deploy, driven by a per-project `## Deploy` block
   deploy-init/            Capture an understood deploy process into that `## Deploy` block
+  surface-review/         Goal-first review of a screen by an independent agent, recorded per screen
+  surface-review-init/    Set an app up for it: registry, seed command, records, gate + lint wired in
+standards/
+  surface-review.md          THE surface review standard: goal, friction checklist, output, how it is enforced
+scripts/
+  check_surface_reviews.py   The gate (stdlib): refuses an unreviewed or unregistered screen
+  surface_lint.py            The layout lint (Playwright): overflow, wrap, tap size, console, contrast, fold
 templates/
   project-records-block.md   The `## Project records` contract block for CLAUDE.md
   PROJECT_STATUS.md / ROADMAP.md / HISTORY.md   Tier headers
@@ -51,6 +58,10 @@ templates/
   deploy-block.md            The `## Deploy` contract block for CLAUDE.md
   working-preferences.md     Reusable Innoveta operating doctrines (edit per project)
 ```
+
+### Surface review: the machines do the nitpicks
+
+Every app with screens runs ONE review method (`standards/surface-review.md`): the job written once per screen, an independent fresh-agent reviewer, a severity scale and a stop rule, a mechanical layout lint, and a gate in the app's landing path that refuses a screen change nobody reviewed. Apps FETCH the scripts at a pinned commit (`plugin_ref` in their `surface-review.toml`), never copy them. Set an app up with `/surface-review-init`.
 
 ### Deploy is config-driven, not hardcoded
 
@@ -78,4 +89,4 @@ The six skills then become available: invoke them with `/project-records-init`, 
 
 ## Status
 
-`v0.2.1` — the four records/ideas skills are production-proven; `deploy` + `deploy-init` are new (config-driven, gap-detection handoff); templates and this README are first-draft. Triggering relies on each skill's description (model-invoked — no manual call required), with the high-frequency `deploy` skill routing into the harder-to-time `deploy-init`. A deterministic hooks layer (fire on an actual `git push`) is a possible future add only where a missed trigger would be costly.
+`v0.3.0` — the surface review (standard, two skills, gate + lint scripts) is new; the four records/ideas skills are production-proven; `deploy` + `deploy-init` are new (config-driven, gap-detection handoff); templates and this README are first-draft. Triggering relies on each skill's description (model-invoked — no manual call required), with the high-frequency `deploy` skill routing into the harder-to-time `deploy-init`. A deterministic hooks layer (fire on an actual `git push`) is a possible future add only where a missed trigger would be costly.

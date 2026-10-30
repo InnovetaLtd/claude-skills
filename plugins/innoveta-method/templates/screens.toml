@@ -1,0 +1,22 @@
+# The screen registry: one entry per screen, its JOB written once (standards/surface-review.md §1).
+# The reviewer, the layout lint and the gate all read it.
+#
+#   slug       the record's file name (<records>/<slug>.md) and the seed command's screen name
+#   route      for a reader; the address itself comes from the seed command
+#   templates  the page template plus any include ONLY this screen uses; their fingerprint dates a review
+#   who/job/questions/done   the four goal lines, in the user's words
+#   answer     a Playwright selector for what answers the FIRST question; it must start above the fold
+#   answer_by_setup  an override where a setup shows a different first answer (an empty page)
+#   setups     the seed command's setups; at least `empty` and `typical`
+
+[[screen]]
+slug = "example-screen"
+title = "Example"
+route = "example"
+templates = ["templates/example.html"]
+who = "Who uses it, and where (desk or phone)."
+job = "The job, in one sentence."
+questions = ["The first question the job asks", "The next"]
+done = "The state in which the user leaves satisfied."
+answer = "h1"
+setups = ["empty", "typical"]
