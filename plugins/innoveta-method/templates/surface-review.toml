@@ -1,0 +1,28 @@
+# Surface review: how innoveta-method's gate and layout lint run in THIS app (standards/surface-review.md §4).
+# The scripts are fetched from innoveta-method at `plugin_ref`, never copied. Bump the ref to take a new method.
+
+plugin_repo = "https://github.com/InnovetaLtd/innoveta-method.git"
+plugin_ref = "TODO: the innoveta-method commit this app runs"
+
+registry = "docs/screens.toml"
+records = "docs/reviews/screens"
+unregistered = "docs/reviews/screens/_unregistered.txt"
+lint_baseline = "docs/reviews/screens/_lint_baseline.json"
+
+# A PAGE template is one under these globs containing `page_marker`; any other is a shared include.
+page_templates = ["templates/**/*.html"]
+page_marker = "{% extends"
+# Files that reach many screens: a change to one lints every registered screen.
+shared = ["static/*.css", "static/*.js", "templates/**/*.html"]
+
+[lint]
+# `{python}` the interpreter running the lint · `{data_dir}` a fresh scratch folder · `{port}` a free port.
+prepare = ["TODO: build a fresh baseline database in {data_dir}"]
+seed = ["{python}", "TODO: the seed command", "{screen}", "{setup}"]
+serve = ["TODO: start the dev server on {port}"]
+env = { TODO_DATA_DIR = "{data_dir}", TODO_DEV_USER = "TODO" }
+drop_env = []
+# JavaScript run before any page script: switches the app to `{theme}` (light or dark).
+theme_init = "TODO"
+button_selector = ".btn"
+tap_selector = ".btn, button, input[type=submit], input[type=button]"
