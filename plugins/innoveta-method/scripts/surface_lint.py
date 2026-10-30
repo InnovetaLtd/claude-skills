@@ -67,6 +67,10 @@ from pathlib import Path
 
 # The four page variants every URL is loaded in. Widths are named in failure keys, never measured.
 WIDTHS = {'phone': (375, 812), 'desk': (1280, 900)}
+# The phone is a TOUCH device, not a narrow desk window: apps size their targets under
+# `(hover:none), (pointer:coarse)`, which only a touch context matches. Without it the tap rule
+# measured desk-sized buttons at 375 px and reported targets a real phone draws at 44 px.
+DEVICE = {'phone': {'has_touch': True, 'is_mobile': True}, 'desk': {}}
 THEMES = ('light', 'dark')
 RULES = ('overflow', 'wrap', 'tap', 'console', 'contrast', 'fold')
 
@@ -537,7 +541,7 @@ def lint_urls(targets, base, cfg, channel):
             for width_name, (w, h) in WIDTHS.items():
                 for theme in THEMES:
                     context = browser.new_context(viewport={'width': w, 'height': h},
-                                                  color_scheme=theme)
+                                                  color_scheme=theme, **DEVICE[width_name])
                     if lint_cfg.get('theme_init'):
                         context.add_init_script(fill(lint_cfg['theme_init'], theme=theme))
                     for screen, setup, url, answer in targets:
