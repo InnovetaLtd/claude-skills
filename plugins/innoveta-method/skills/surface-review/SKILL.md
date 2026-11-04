@@ -26,14 +26,17 @@ app's registry with them, and stop: the design follows the questions in order.
    rulings from its record, and "report in standard §3's shape, every finding rated major/moderate/minor with its
    evidence". ⚠️ Never your summary of what you changed, never the diff: a reviewer handed the builder's claims
    checks the claims, not the page.
-4. **Deal with each finding.** Fix what is in scope; a minor finding may be waived with a reason; anything you
-   cannot fix becomes Ben's call: take phone + desk screenshots, send them to him, and add one line to the
-   app's owed ledger. The change still lands.
+4. **Deal with each finding.** Fix what is in scope; a minor finding may be waived with a reason. A **layout or
+   plumbing** call is yours to rule at any severity (standard SR12c): read the record's *Rulings* first, and never
+   rule money, stored values, customer words, what a record states to an auditor, access, or against a ruling.
+   Build it now or note it to build. Anything else becomes Ben's call: take phone + desk screenshots, send them
+   to him, and add one line to the app's decision queue (its owed ledger until it has one). The change still lands.
 5. **Repeat full passes with a NEW reviewer** until a pass finds nothing above minor. Repeats, re-wordings and
    ruled points do not count; if a pass only re-words earlier findings, stop.
 6. **Write the record** (`<records>/<slug>.md`): append an `[[entry]]` with `kind = "review"`, the date, the
    screen's fingerprint (`check_surface_reviews.py --fingerprint <slug>`), the number of passes, and one
-   `[[entry.finding]]` per finding (`id`, `severity`, `outcome`, `what`, `reason` where waived or Ben's). Add any
+   `[[entry.finding]]` per finding (`id`, `severity`, `outcome`, `what`, `reason` where waived, ruled or Ben's;
+   a ruled one adds `decider` and `scope = "layout"` or `"plumbing"`). Add any
    new ruling of Ben's under *Rulings*. A change that needed no review appends `kind = "na"` with its `reason`.
 7. **Run the gate** (`python scripts/surface_method.py gate`) before handing the change to the landing path.
 

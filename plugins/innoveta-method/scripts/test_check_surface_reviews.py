@@ -89,6 +89,18 @@ class GateTests(unittest.TestCase):
         self.assertIn('orders finding 1: only a minor finding may be waived', out)
         self.assertIn('orders finding 2: has no outcome', out)
 
+    def test_a_ruled_finding_names_its_decider_reason_and_a_layout_or_plumbing_scope(self):
+        self.record(findings='[[entry.finding]]\nid = "1"\nseverity = "major"\noutcome = "ruled"\n'
+                             'decider = "Claude"\nscope = "layout"\nreason = "r"\n'
+                             '[[entry.finding]]\nid = "2"\nseverity = "moderate"\noutcome = "ruled"\n'
+                             'scope = "money"\n')
+        code, out = self.run_gate()
+        self.assertEqual(code, 1)
+        self.assertNotIn('orders finding 1:', out)
+        self.assertIn('orders finding 2: a ruled finding needs its reason', out)
+        self.assertIn('orders finding 2: a ruled finding names its decider', out)
+        self.assertIn('orders finding 2: a ruled finding is scoped layout or plumbing', out)
+
     def test_an_unregistered_page_must_register_when_touched_and_the_list_entry_goes_when_stale(self):
         self.record()
         (self.app / 'templates' / 'legacy.html').write_text('{% extends "base.html" %}old')

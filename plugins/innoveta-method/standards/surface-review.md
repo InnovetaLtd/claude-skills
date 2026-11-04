@@ -73,8 +73,18 @@ rulings) · two **shrink-only lists**: page templates not yet registered, and th
 *Moderate*: extra presses, a trip off the page, a re-read. *Minor*: polish that does not change how the job goes.
 The reviewer rates; Ben's ruling overrides.
 
-**Outcomes (SR12).** Every finding ends **fixed**, **waived** (minor only, with a reason, SR12a) or **ben** (his
-call: the change lands as built, the call goes to the app's owed ledger with phone + desk screenshots, SR12b).
+**Outcomes (SR12).** Every finding ends **fixed**, **waived** (minor only, with a reason, SR12a), **ruled**
+(SR12c) or **ben** (his call: the change lands as built, the call goes to the app's decision queue with phone +
+desk screenshots, SR12b; an app with no queue yet uses its owed ledger).
+
+**Ruled (SR12c, Ben 2026-11-04: *"happy for you to own plumbing and layout general decisions unless I have
+explicitly requested a certain UI layout"*).** The builder decides a finding itself, at any severity, when it is
+**layout** (arrangement, ordering, placement, folds, what sits above the fold) or **plumbing** (internal wiring a
+user never reads). The record names the `decider`, the `scope` and a one-line `reason`. **Never ruled, always
+ben:** money or rates · a stored value or code identifier · customer-facing words or e-mails · what a record
+STATES to an auditor (its content and meaning; its arrangement is layout) · access or security · anything that
+contradicts the screen's *Rulings*. An **explicit request** is any ruling recorded on the screen, an accepted
+recommendation included: read the record's *Rulings* before ruling, and to undo one, ask. In doubt, it is ben.
 
 **Independence (SR8).** The reviewer is a FRESH agent on the same model, briefed only with the registry entry,
 the address and the setups, and the screen's rulings. Never the builder's summary or the diff.
