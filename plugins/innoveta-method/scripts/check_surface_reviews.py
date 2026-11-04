@@ -23,7 +23,8 @@ It fails (exit 1) when:
   4. a registered screen has no record, or its record's latest entry does not match the templates'
      current fingerprint (the screen changed after its last review);
   5. a record breaks the finding rules: every finding rated major/moderate/minor and ended
-     fixed/waived/ben; a waiver only on a minor finding, with a reason (SR9, SR12, SR12a);
+     fixed/waived/ben/ruled; a waiver only on a minor finding, with a reason; a ruling names its
+     decider, its reason and a layout/plumbing scope (SR9, SR12, SR12a, SR12c);
   6. with --base: the unregistered list or the lint baseline GREW (SR17, SR18: shrink-only).
 An `n/a` entry (a change that needed no review, with its reason) passes, and is listed in the output
 so it stays visible (SR3)."""
@@ -36,7 +37,8 @@ import tomllib
 from pathlib import Path
 
 SEVERITIES = ('major', 'moderate', 'minor')
-OUTCOMES = ('fixed', 'waived', 'ben')
+OUTCOMES = ('fixed', 'waived', 'ben', 'ruled')
+RULED_SCOPES = ('layout', 'plumbing')
 GOAL_KEYS = ('who', 'job', 'questions', 'done', 'answer')
 REQUIRED_SETUPS = ('empty', 'typical')
 
@@ -152,8 +154,14 @@ def check_finding(slug, finding):
         problems.append(f'{ident}: has no outcome; end it as {", ".join(OUTCOMES)} (SR12).')
     if outcome == 'waived' and severity != 'minor':
         problems.append(f'{ident}: only a minor finding may be waived; fix it or make it Ben\'s call (SR12a).')
-    if outcome in ('waived', 'ben') and not finding.get('reason'):
+    if outcome in ('waived', 'ben', 'ruled') and not finding.get('reason'):
         problems.append(f'{ident}: a {outcome} finding needs its reason.')
+    if outcome == 'ruled':
+        if not finding.get('decider'):
+            problems.append(f'{ident}: a ruled finding names its decider (SR12c).')
+        if finding.get('scope') not in RULED_SCOPES:
+            problems.append(f'{ident}: a ruled finding is scoped {" or ".join(RULED_SCOPES)}; '
+                            f'anything else is Ben\'s call (SR12c).')
     return problems
 
 
