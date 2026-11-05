@@ -126,6 +126,23 @@ class SelectionTests(unittest.TestCase):
         self.assertEqual(picked, ['orders'])
         self.assertIn('via static/orders.js', out)
 
+    def test_a_script_named_only_in_another_scripts_comments_is_not_loaded_by_it(self):
+        # BM #1493: prose in comments chained tick-bar.js to 45 scripts, so every screen was linted.
+        self.change('static/everywhere.js', append='\n// see `orders-helper.js`\n/* and "orders-helper.js" */')
+        git(self.app, '-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qam', 'comment')
+        self.change('static/orders-helper.js', append='\n// tweak')
+        picked, out = self.select()
+        self.assertEqual(picked, ['orders'])
+        self.assertNotIn('everywhere.js', out)
+
+    def test_js_strip_comments_keeps_strings_and_drops_comments(self):
+        src = 'import "./a.js"; // b.js\nvar u = "http://x/c.js"; /* d.js */ var t = `e.js // f`;'
+        out = lint.js_strip_comments(src)
+        for kept in ('./a.js', 'http://x/c.js', '`e.js // f`'):
+            self.assertIn(kept, out)
+        for gone in ('b.js', 'd.js'):
+            self.assertNotIn(gone, out)
+
     def test_a_script_base_loads_selects_every_page(self):
         self.change('static/everywhere.js', append='\n// tweak')
         self.assertEqual(self.select()[0], ['invoices', 'orders', 'people'])
