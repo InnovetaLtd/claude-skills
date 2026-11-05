@@ -1146,8 +1146,8 @@ def lint_page(context, base, url, screen, setup, width_name, theme, answer, butt
     page.on('console', on_console)
     page.on('pageerror', lambda e: errors.append(f'uncaught: {e}'))
     page.on('response', on_response)
-    page.on('request', inflight.add)
-    page.on('requestfinished', inflight.discard)
+    page.on('request', lambda r: inflight.add(r))          # Playwright wants Python callables,
+    page.on('requestfinished', lambda r: inflight.discard(r))   # not builtin methods
     page.on('requestfailed', on_failed)
     try:
         response = page.goto(base + url, wait_until='load', timeout=60000)
@@ -1258,7 +1258,7 @@ def lint_urls(targets, base, cfg, channel, workers=1):
     for th in threads:
         th.join()
     if fatal:
-        sys.exit('surface lint: page(s) did not settle, so nothing measured is trustworthy:\n  '
+        sys.exit('surface lint: page loading failed (a page did not settle, or a worker died), so nothing measured is trustworthy:\n  '
                  + '\n  '.join(fatal))
     missing = [j for j in jobs if j not in results]
     if missing:
@@ -1291,7 +1291,10 @@ def world_digest(cfg, app, env, subs, data_dir):
         try:
             tables = [r[0] for r in con.execute(
                 "select name from sqlite_master where type = 'table' order by name")]
-            for table in tables:
+            # `world_digest_ignore`: tables a page GET may write that NO registered screen reads
+            # (a write-only analytics roll-up); each entry must say why in the app's toml.
+            ignore = set(cfg['lint'].get('world_digest_ignore', []))
+            for table in (t for t in tables if t not in ignore):
                 rows = sorted(repr(r) for r in con.execute(f'select * from "{table}"'))
                 out[f'{db.name}:{table}'] = hashlib.sha256('\n'.join(rows).encode()).hexdigest()
         finally:
