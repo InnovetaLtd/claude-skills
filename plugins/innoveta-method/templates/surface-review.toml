@@ -12,13 +12,20 @@ lint_baseline = "docs/reviews/screens/_lint_baseline.json"
 # A PAGE template is one under these globs containing `page_marker`; any other is a shared include.
 page_templates = ["templates/**/*.html"]
 page_marker = "{% extends"
-# Files that reach many screens: a change to one lints every registered screen.
+# Files that reach many screens. A change to one lints the screens it reaches (templates by the include /
+# extends graph, scripts by <script src>, stylesheets by changed selector), or every screen when unsure.
 shared = ["static/*.css", "static/*.js", "templates/**/*.html"]
 
 [lint]
 # `{python}` the interpreter running the lint · `{data_dir}` a fresh scratch folder · `{port}` a free port.
 prepare = ["TODO: build a fresh baseline database in {data_dir}"]
 seed = ["{python}", "TODO: the seed command", "{screen}", "{setup}"]
+# Optional, faster: one process seeds every setup in order ({batch_file}: a JSON list of {"screen", "setup"};
+# print one {"screen", "setup", "url"} or {"screen", "setup", "error"} line per setup, keep going on a failure).
+# seed_batch = ["{python}", "TODO: the seed command", "--batch", "{batch_file}"]
+# Browsers loading pages at once. Above 1 the lint hashes every SQLite table before and after the page loads
+# and fails the run if a page wrote anything (`world_digest = [cmd]` for a server database).
+# parallel = 4
 serve = ["TODO: start the dev server on {port}"]
 env = { TODO_DATA_DIR = "{data_dir}", TODO_DEV_USER = "TODO" }
 drop_env = []
@@ -26,3 +33,10 @@ drop_env = []
 theme_init = "TODO"
 button_selector = ".btn"
 tap_selector = ".btn, button, input[type=submit], input[type=button]"
+# settle_timeout_ms = 15000   # a page not quiet by then fails the run
+
+# [select]                    # how a changed shared file is traced to screens (defaults shown)
+# mode = "precise"            # or "shared-all": any shared file lints every screen
+# code = ["**/*.py"]          # app code: a template, script or CSS token it names may be on any page
+# code_exclude = ["**/test_*.py", "**/*_test.py", "**/tests.py", "**/tests/**", "**/migrations/**"]
+# css_var_fanout_max = 12     # a custom property read by more rules than this lints every screen
