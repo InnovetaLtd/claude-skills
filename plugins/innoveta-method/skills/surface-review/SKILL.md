@@ -16,8 +16,9 @@ app's registry with them, and stop: the design follows the questions in order.
 ## The procedure (as the builder)
 
 1. **Map the change to screens.** A changed page template is its screen (the registry's `templates`). A changed
-   shared file (the config's `shared` globs) needs the lint on every screen, and a review only of the screens the
-   change was MEANT to alter. An unregistered screen you touched registers now: its goal lines, its setups in the
+   shared file (the config's `shared` globs) needs the lint on the screens it reaches (`surface_lint.py
+   --changed-since <ref> --select-only` prints which, and why; it falls back to every screen when unsure), and a
+   review only of the screens the change was MEANT to alter. An unregistered screen you touched registers now: its goal lines, its setups in the
    app's seed command (at least `empty` and `typical`), and its record.
 2. **Run the lint** on those screens (the app's wrapper, e.g. `python scripts/surface_method.py lint
    --changed-since origin/master`). Fix every new failure; a fix shrinks the baseline.

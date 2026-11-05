@@ -94,8 +94,10 @@ re-words it, or contradicts a ruling does not count. Minor findings are listed, 
 
 **The lint (SR14–SR17)**: at 375 px and desk, light and dark, it fails on sideways scroll · a wrapped button label
 · a tap target under 44 px on the phone · a console error · contrast under 4.5:1 (3:1 large) · the `answer`
-starting below the fold. It runs on the screens a change touches, or all of them for a shared file; the release
-CI sweeps every screen. Today's failures sit in the baseline, which only shrinks.
+starting below the fold. It runs on the screens a change touches: a changed shared file selects the screens its
+template graph, script tags or changed CSS selectors reach, and every screen whenever that cannot be pinned down
+(an element or `:root` selector, a token app code builds, a file no page reaches); the release CI sweeps every
+screen. A page that does not settle (network idle, fonts, two frames) fails the run. Today's failures sit in the baseline, which only shrinks.
 
 **The gate (SR3–SR6, SR18)** refuses a change when: a page template is neither registered nor on the
 unregistered list · an unregistered page changed (register it on touch) · a screen changed after its record's
