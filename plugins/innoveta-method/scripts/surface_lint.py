@@ -316,7 +316,7 @@ class Estate:
             self.by_name[self.template_name(f)].add(f)
         self.edges = {f: {p for n in QUOTED_TEMPLATE.findall(text) for p in self.by_name.get(n, ())}
                       for f, text in self.templates.items()}
-        self.scripts = {f: self._read(f) for f in files if f.endswith(SCRIPT_EXTS)
+        self.scripts = {f: js_strip_comments(self._read(f)) for f in files if f.endswith(SCRIPT_EXTS)
                         and not matches_any(f, sel.get('script_exclude', []))}
         code_globs = sel.get('code', DEFAULT_CODE_GLOBS)
         code_exclude = sel.get('code_exclude', DEFAULT_CODE_EXCLUDE)
@@ -382,6 +382,32 @@ class Estate:
         if f not in cache:
             cache[f] = self.loaders(served_name(f))
         return cache[f]
+
+
+def js_strip_comments(text):
+    """Script text with its comments blanked, so prose naming another file ("`pick-all.js`'s
+    contract") is not read as loading it. String and template literals are kept whole; a '/" string
+    ends at a newline, so a regex literal misread as a string can hide one line at most."""
+    out, i, n = [], 0, len(text)
+    while i < n:
+        c = text[i]
+        if c in '"\'`':
+            j = i + 1
+            while j < n and text[j] != c and (c == '`' or text[j] != '\n'):
+                j += 2 if text[j] == '\\' else 1
+            out.append(text[i:j + 1])
+            i = j + 1
+        elif text.startswith('//', i):
+            j = text.find('\n', i)
+            i = n if j < 0 else j
+        elif text.startswith('/*', i):
+            j = text.find('*/', i + 2)
+            out.append(' ')
+            i = n if j < 0 else j + 2
+        else:
+            out.append(c)
+            i += 1
+    return ''.join(out)
 
 
 def served_name(path):
@@ -1141,7 +1167,9 @@ def lint_page(context, base, url, screen, setup, width_name, theme, answer, butt
 
     def on_failed(r):
         inflight.discard(r)
-        errors.append(f'request failed {r.url}')
+        # The reason (net::ERR_ABORTED, ERR_CONNECTION_RESET, ...) goes in the measured value, not
+        # the key, so a baseline still matches while the finding says WHY the request failed.
+        errors.append((f'request failed {r.url}', f'request failed {r.url} ({r.failure or "no reason given"})'))
 
     page.on('console', on_console)
     page.on('pageerror', lambda e: errors.append(f'uncaught: {e}'))
@@ -1183,8 +1211,9 @@ def lint_page(context, base, url, screen, setup, width_name, theme, answer, butt
 
         # console: read last, so errors raised while measuring are caught too.
         for msg in errors:
+            msg, shown = msg if isinstance(msg, tuple) else (msg, msg)
             if not is_ignored_console(msg):
-                fail('console', console_text(msg, base), msg[:200])
+                fail('console', console_text(msg, base), shown[:200])
     except Unsettled:
         raise
     except Exception as exc:        # a page that cannot even be measured is a failure, not a crash
