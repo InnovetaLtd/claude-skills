@@ -47,6 +47,7 @@ skills/
   surface-review/         Goal-first review of a screen by an independent agent, recorded per screen
   surface-review-init/    Set an app up for it: registry, seed command, records, gate + lint wired in
   scope/                  Scope a feature as real examples, grilled and ruled, into a build-ready doc
+  walkthrough/            Ben walks what was built on seeded examples; findings sliced and ruled into a doc
 standards/
   surface-review.md          THE surface review standard: goal, friction checklist, output, how it is enforced
   examples-first.md          How anything put to Ben is written: a real worked example first, syntax only where it decides
@@ -59,6 +60,7 @@ templates/
   ideas-README.md / IDEAS_INBOX.md              The ideas convention + board
   deploy-block.md            The `## Deploy` contract block for CLAUDE.md
   scope-appendix.md          Where an app's rulings, terms, screen registry and seed command live, for `scope`
+  walkthrough-appendix.md    An app's throwaway-DB, server, seed, upload and landing commands, for `walkthrough`
   working-preferences.md     Reusable Innoveta operating doctrines (edit per project)
 ```
 
