@@ -54,6 +54,7 @@ standards/
 scripts/
   check_surface_reviews.py   The gate (stdlib): refuses an unreviewed or unregistered screen
   surface_lint.py            The layout lint (Playwright): overflow, wrap, tap size, console, contrast, fold
+  walkthrough_watch.py       Watch mode: record each check as step pictures, build the checklist artifact
 templates/
   project-records-block.md   The `## Project records` contract block for CLAUDE.md
   PROJECT_STATUS.md / ROADMAP.md / HISTORY.md   Tier headers
@@ -61,6 +62,7 @@ templates/
   deploy-block.md            The `## Deploy` contract block for CLAUDE.md
   scope-appendix.md          Where an app's rulings, terms, screen registry and seed command live, for `scope`
   walkthrough-appendix.md    An app's throwaway-DB, server, seed, upload and landing commands, for `walkthrough`
+  walkthrough-checklist.html The checklist artifact page: step pictures, live notes from the artifact's database
   working-preferences.md     Reusable Innoveta operating doctrines (edit per project)
 ```
 

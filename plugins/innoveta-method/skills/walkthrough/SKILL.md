@@ -1,6 +1,6 @@
 ---
 name: walkthrough
-description: Ben's live review of what was just built in an Innoveta app. Claude prepares a dev server on a throwaway database, seeds an example record and any upload documents for each change, and hands over a numbered checklist. Ben gives numbered feedback one item at a time ("Noted — slice: …") and Claude fixes trivial bugs live. At "review complete" everything is grouped into six slices, the open calls are ruled there and then, and a walkthrough doc is written that a fresh session can pick up cold. Use when Ben says "walkthrough", "let me review what's built", "load up the dev server and give me a list of items to check", or after an integration lands and before /deploy. NOT a critique of one screen (surface-review), NOT a bug-report pass, NOT a deploy gate.
+description: Ben's live review of what was just built in an Innoveta app. Claude prepares a dev server on a throwaway database, seeds an example record and any upload documents for each change, and publishes a numbered checklist artifact; started from a phone over Remote Control, it runs in watch mode, where Claude walks each check itself and the checklist shows step pictures. Ben gives numbered feedback one item at a time ("Noted — slice: …") and Claude fixes trivial bugs live. At "review complete" everything is grouped into six slices, the open calls are ruled there and then, and a walkthrough doc is written that a fresh session can pick up cold. Use when Ben says "walkthrough", "let me review what's built", "load up the dev server and give me a list of items to check", or after an integration lands and before /deploy. NOT a critique of one screen (surface-review), NOT a bug-report pass, NOT a deploy gate.
 ---
 
 # Walkthrough: Ben walks what was built; Claude prepares, listens, then slices
@@ -14,6 +14,15 @@ remembering what he said. Designed with Ben in Build Manager on 2026-10-23, afte
 throwaway database, the server command and sign-in, the seed command, the upload folder, the record locations, and
 the landing path. **No appendix ⇒ stop and offer to write one** from the app's dev docs; a walkthrough run blind
 guesses commands into somebody's real database.
+
+## 0. Desk or watch: decide before preparing
+
+- **Watch mode when Ben started this from a remote device**: the harness says he is on Remote Control, or he says
+  he is on his phone or away from the desk. His phone cannot reach the walkthrough server, so **Claude walks every
+  check itself** and the checklist shows step pictures (§2b). If it is unclear, ask once.
+- **Desk mode otherwise**: Ben walks the checks himself on the walkthrough server.
+- **Both modes publish the checklist as an artifact** (§3): the checklist in one window, the app in another (desk
+  mode), and Claude in a third for feedback. Nobody scrolls the chat to find item 7.
 
 ## 1. Scope: what gets a check
 
@@ -51,15 +60,42 @@ Tooling, docs and test-only changes get no check.
 8. **Things that cannot work locally** (a cloud API fetch, a real AI read, a call to a sibling app) are named in the
    check's *What you should see*, so a local failure is never mistaken for a bug.
 
-## 3. The checklist and the walk
+## 2b. Watch mode: record every check
 
-Hand over a **numbered chat table**: `# · Check (bug/item id) · Where (direct links on the walkthrough port) · What
-to do and what you should see`. Put bug fixes on seeded records first, then checks on existing pages. Save the same
-table into the walkthrough doc (§5).
+1. **Write a plan per check**: the steps a user would take, ending at what Ben is judging, with a picture
+   (`shot`) at every step whose screen he needs to see, captioned in plain English with what it shows. Use the
+   phone viewport for phone-first screens and the desktop one otherwise. The plan format is in
+   `scripts/walkthrough_watch.py`'s docstring.
+2. **Record it**: `walkthrough_watch.py record plan.json --out <scratchpad>/shots`, with the Python the appendix
+   names (it needs Playwright). **A check that stopped is a finding:** its last picture shows where and why. Fix
+   the plan if the plan was wrong; otherwise it goes on the checklist as it is, under finding #0.
+3. **Mark what pictures cannot judge**: a check whose point is *feel* (typing into a fiddly field, a drag, a tap
+   target, the camera) gets `desk_only`. Its card says *walk at a desk later*, and the walkthrough doc lists it as
+   an owed desk check, so it is never quietly passed.
+4. **Re-recording**: after a live fix, record that one check again and republish (§3), then say "fixed: see #n".
+
+## 3. The checklist artifact and the walk
+
+**Build the checklist as an artifact page**, from `templates/walkthrough-checklist.html`, by
+`walkthrough_watch.py page walk.json --out <scratchpad>/walkthrough-<date>.html` (`walk.json`: title, date, range,
+mode, server, finding #0, and per check its number, title, ids, the data shapes that matter, where, and what you
+should see; watch mode adds `--manifest`). Then:
+1. **Publish** it with `capabilities: {db: {}, assets: {}}` (the `artifact-capabilities` skill holds the call shapes).
+2. **Watch mode: upload the pictures** to the artifact's assets (`asset: true`, up to 25 files per call), write
+   `{file: url}` to `urls.json`, rebuild with `--assets urls.json`, and republish the same file.
+3. **Send Ben the link** with a one-line note on how to use it. Desk mode's links point at the walkthrough
+   server; watch mode's pictures open full size when tapped.
+4. **Notes go to the artifact's database, not into the page**: as each feedback item lands, write `checks/c<n>`
+   (`{n, state, slice, note}`; state is `noted`, `ok`, `fixed`, `recheck` or `regression`) with the `ArtifactData`
+   tool. The card updates while Ben watches. At "review complete", write `meta/summary` (`{phase: "complete",
+   slices: [{name, items}], rulings, doc}`).
+
+Order the checks with bug fixes on seeded records first, then checks on existing pages. Save the same table into
+the walkthrough doc (§5); the artifact is Ben's view, **the doc stays the record** a fresh session reads.
 
 **During the walk:**
-- **Each feedback item gets one line:** `Noted — slice: <slice name>` (§4). Nothing else. Don't argue, propose or
-  summarise.
+- **Each feedback item gets one line:** `Noted — slice: <slice name>` (§4), and the same note on its card (§3.4).
+  Nothing else. Don't argue, propose or summarise.
 - **A direct question gets a full answer, grounded in the code.** Read it; never answer from memory. Record the
   question as a finding if the answer exposes a gap.
 - **Speak up unasked only on a clearly large error.** That means a factual misreading of what the app does (thinking

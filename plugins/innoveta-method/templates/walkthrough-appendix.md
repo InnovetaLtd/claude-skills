@@ -14,6 +14,7 @@ docs: never guess one, since the skill runs them against a database.
 | Signing in as Ben locally | TODO: e.g. a dev-user environment variable |
 | The ONE seed command | TODO: e.g. `manage.py seed_shapes <screen> <setup>` |
 | Upload documents | TODO: the folder they go in, and what renders a realistic PDF |
+| Watch mode's recorder | TODO: the Python that has Playwright for `walkthrough_watch.py record`, and the browser channel |
 | Phone-first screens | TODO: the screens that carry a "check on a phone" step |
 | What cannot work locally | TODO: the cloud fetches, AI reads and sibling-app calls a check must name |
 | The walkthrough doc | TODO: e.g. `docs/reviews/<date>-walkthrough.md` |
