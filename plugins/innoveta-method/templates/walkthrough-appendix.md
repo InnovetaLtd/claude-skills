@@ -1,21 +1,17 @@
 # Walkthrough appendix: <App name>
 
-How innoveta-method's `walkthrough` skill runs in THIS app. The method lives in the plugin; this file only holds the
-app's commands and locations. Save it as `docs/walkthrough-appendix.md`. Read every command from the app's own dev
-docs: never guess one, since the skill runs them against a database.
+How innoveta-method's `walkthrough` skill runs in THIS app. The method lives in the plugin, and how to prepare,
+seed and serve the app lives ONCE, in `surface-review.toml` (the walkthrough records through the same engine).
+This file holds only what a walkthrough needs beyond that. Save it as `docs/walkthrough-appendix.md`. Read every
+command from the app's own dev docs: never guess one, since the skill runs them against a database.
 
 | What | Where / how |
 |---|---|
 | The live SHA (start of the default range) | TODO: e.g. the `DEPLOY STATE` line in CLAUDE.md, or a `live` tag |
 | What landed since (Fixed tables, rulings) | TODO: e.g. `docs/bug-intake-*.md`, `docs/rulings-*.md` |
-| The walkthrough worktree | TODO: e.g. `git worktree add -b claude/walkthrough-<date> ../<app>-walkthrough-<date> origin/master` |
-| A throwaway database | TODO: the command that builds a fresh one into a given folder, and how the server is pointed at it |
-| The server | TODO: the start command, no auto-reload; how a free port is measured |
-| Signing in as Ben locally | TODO: e.g. a dev-user environment variable |
-| The ONE seed command | TODO: e.g. `manage.py seed_shapes <screen> <setup>` |
+| Running the plugin's scripts | TODO: how this app runs `surface_record.py` and `review_report.py` at its pinned `plugin_ref` (e.g. its wrapper's `record` / `report`), and the Python that has Playwright |
+| A desk server Ben can drive | TODO: a seeded throwaway database and the serve command (usually the `[lint]` commands by hand), a measured free port, the dev-user sign-in |
 | Upload documents | TODO: the folder they go in, and what renders a realistic PDF |
-| Watch mode's recorder | TODO: the Python that has Playwright for `walkthrough_watch.py record`, and the browser channel |
-| Phone-first screens | TODO: the screens that carry a "check on a phone" step |
 | What cannot work locally | TODO: the cloud fetches, AI reads and sibling-app calls a check must name |
 | The walkthrough doc | TODO: e.g. `docs/reviews/<date>-walkthrough.md` |
 | Ledger, index, ideas board | TODO: where the one owed line, the index row and parked items go, and the not-yet-built marker |

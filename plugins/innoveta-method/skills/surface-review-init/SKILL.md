@@ -12,18 +12,21 @@ The method is `standards/surface-review.md` (§4 is what this sets up). The scri
    current innoveta-method master commit), the registry / records / lists paths, `page_templates` + `page_marker`
    (what makes a template a PAGE rather than an include in this framework), `shared` globs, and `[lint]`: how to
    prepare a fresh scratch database, seed a setup, serve the app on `{port}`, the env that signs a dev user in,
-   the theme switch, and the button / tap selectors of its component catalogue. Read the app's own dev docs for
+   the theme switch, and the button / tap selectors of its component catalogue; and `[record] hide`, the
+   app's floating chrome (scan buttons, quick-action bubbles) the recorder hides from its pictures. Read the app's own dev docs for
    these: never guess a command into a gate.
 2. **Write the registry** (`templates/screens.toml`) and register the screens the current work touches, with
-   their goal lines from the user's words.
+   their goal lines from the user's words, and a `[[screen.flow]]` for each scenario the work makes true.
 3. **Build the seed command**: one command, `<screen> <setup>` → prints `{"url": "/path"}`, idempotent, on top of
    the app's baseline seed. Add a test that the registry's setups and the command's agree.
 4. **Bootstrap the lists**: `check_surface_reviews.py --app . --init-unregistered`, then
    `surface_lint.py --app . --all --write-baseline`. Both only shrink from here on.
 5. **Wire the landing path**: a small wrapper in the app that keeps a cache clone of this repo, checks out
    nothing, and runs the scripts from `git show <plugin_ref>:<path>` (Build Manager's `scripts/surface_method.py`
-   is the reference). Run the gate where a change lands (a merge queue: before the suite, the lint after it; CI on
-   push: as steps) and the lint `--all` in the release CI.
+   is the reference). It exports `check_surface_reviews.py`, `surface_lint.py`, `surface_record.py`,
+   `review_report.py` and `templates/walkthrough-checklist.html` together (the recorder imports the lint and the
+   gate, and fills the template). Run the gate where a change lands (a merge queue: before the suite, the lint
+   after it; CI on push: as steps) and the lint `--all` in the release CI.
 6. **Add the app's appendix** (its catalogue, terminology and any worked examples) and a `## Surface review`
    pointer in its CLAUDE.md. Record the setup in its records and owed ledger as the app's rules require.
 7. **Prove it**: a worked example where the gate refuses an unregistered page and a changed, unreviewed screen.

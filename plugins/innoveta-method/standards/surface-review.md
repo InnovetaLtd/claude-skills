@@ -69,6 +69,20 @@ the `answer` element, data setups) · **one seed command** printing a setup's ad
 the manuals all seed through it) · a **record per screen** (TOML block the gate reads, then prose and Ben's
 rulings) · two **shrink-only lists**: page templates not yet registered, and the lint baseline.
 
+**Flows (Ben, 2026-11-08: one review pipeline).** A screen's registry entry may carry `[[screen.flow]]`
+entries: a scenario walked on the running screen (a `setup`, the `steps` a user takes, and what they should
+`sees`, in the scope's words). A scope's slice 0 registers one per scenario. `surface_record.py` records them as
+pictures through the same prepare, seed and serve as the lint; the builder walks its own pictures first, the
+reviewer judges them, and the walkthrough shows them to Ben beside the same walk recorded on the live SHA.
+
+**Records teach the method.** A record holds `review`, `na` and `walkthrough` entries; only the latest review or
+n/a dates the screen. Every finding says where it was found (`origin`: lint, review, self-walk, walkthrough).
+Every walkthrough finding also says which layer should have caught it (`caught_by`: scope, canon, review, lint,
+test, taste). Where it applies, it names the friction-checklist `row` or the catalogue `component`.
+`review_report.py` reads them all. It reports **the leak** (not-taste walkthrough findings per walkthrough: they
+should fall) and **what repeats** (a row or component on two or more screens). A repeat is promoted into the
+layer that should have caught it.
+
 **Severity (SR9).** *Major*: the user gets the job wrong or cannot finish it (a misleading total, a dead end).
 *Moderate*: extra presses, a trip off the page, a re-read. *Minor*: polish that does not change how the job goes.
 The reviewer rates; Ben's ruling overrides.

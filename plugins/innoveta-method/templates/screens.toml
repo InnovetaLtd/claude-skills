@@ -8,6 +8,10 @@
 #   answer     a Playwright selector for what answers the FIRST question; it must start above the fold
 #   answer_by_setup  an override where a setup shows a different first answer (an empty page)
 #   setups     the seed command's setups; at least `empty` and `typical`
+#   [[screen.flow]]  a scenario walked on the running screen (surface_record.py records it as pictures):
+#              name · setup (one of `setups`; the walk starts on its seeded address) · sees (what the user
+#              should see at the end, in the scope's words) · steps (one verb each: goto, click, fill, select,
+#              press, wait; `shot = "caption"` keeps a picture) · optional scenario (`S3`) and viewport (`phone`)
 
 [[screen]]
 slug = "example-screen"
@@ -20,3 +24,13 @@ questions = ["The first question the job asks", "The next"]
 done = "The state in which the user leaves satisfied."
 answer = "h1"
 setups = ["empty", "typical"]
+
+[[screen.flow]]
+name = "S1-the-happy-path"
+scenario = "S1"
+setup = "typical"
+sees = "What the user should see when the job is done, in the scope's words."
+steps = [
+  {shot = "The screen as it opens"},
+  {click = "button:has-text('Save')", shot = "After Save"},
+]

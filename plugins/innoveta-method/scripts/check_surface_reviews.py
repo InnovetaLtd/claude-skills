@@ -24,8 +24,15 @@ It fails (exit 1) when:
      current fingerprint (the screen changed after its last review);
   5. a record breaks the finding rules: every finding rated major/moderate/minor and ended
      fixed/waived/ben/ruled; a waiver only on a minor finding, with a reason; a ruling names its
-     decider, its reason and a layout/plumbing scope (SR9, SR12, SR12a, SR12c);
-  6. with --base: the unregistered list or the lint baseline GREW (SR17, SR18: shrink-only).
+     decider, its reason and a layout/plumbing scope (SR9, SR12, SR12a, SR12c). A finding's `origin`
+     (lint, review, self-walk, walkthrough) and `caught_by` (the layer that should have caught it)
+     come from fixed lists; a walkthrough finding must say `caught_by`, and may also end `open` (sent
+     to a build slice: it names the walkthrough `doc`) or `parked`;
+  6. a registry flow is malformed (no name, a setup the screen does not list, no `sees`, a step
+     that is not one of the recorder's verbs);
+  7. with --base: the unregistered list or the lint baseline GREW (SR17, SR18: shrink-only).
+A record holds three kinds of entry: `review`, `n/a` (`na`) and `walkthrough` (Ben's findings from a
+walkthrough). Only the latest review or n/a entry dates the screen; a walkthrough entry never does.
 An `n/a` entry (a change that needed no review, with its reason) passes, and is listed in the output
 so it stays visible (SR3)."""
 import argparse
@@ -41,6 +48,14 @@ OUTCOMES = ('fixed', 'waived', 'ben', 'ruled')
 RULED_SCOPES = ('layout', 'plumbing')
 GOAL_KEYS = ('who', 'job', 'questions', 'done', 'answer')
 REQUIRED_SETUPS = ('empty', 'typical')
+KINDS = ('review', 'na', 'walkthrough')
+ORIGINS = ('lint', 'review', 'self-walk', 'walkthrough')
+#: The layer that SHOULD have caught a finding: what the review report counts to show where the
+#: method leaks (a repeat is promoted into that layer).
+CAUGHT_BY = ('scope', 'canon', 'review', 'lint', 'test', 'taste')
+WALKTHROUGH_OUTCOMES = ('open', 'parked')
+#: A flow step is one of these verbs (surface_record.py runs them); `shot` may ride on any step.
+STEP_VERBS = ('goto', 'click', 'fill', 'select', 'press', 'wait', 'shot')
 
 
 def load_config(app):
@@ -123,6 +138,37 @@ def check_registry(app, screens):
         missing = [s for s in REQUIRED_SETUPS if s not in screen.get('setups', [])]
         if missing:
             problems.append(f'{slug}: needs the setups {", ".join(missing)} (SR13).')
+        problems.extend(check_flows(slug, screen))
+    return problems
+
+
+def check_flows(slug, screen):
+    """A flow is a scenario walked on the running screen: a setup, the steps a user takes, and what
+    they should SEE at the end (the scope's words). The recorder runs it; the reviewer judges the
+    pictures against `sees`."""
+    problems, names = [], set()
+    for i, flow in enumerate(screen.get('flow', [])):
+        name = flow.get('name') or f'flow {i + 1}'
+        ident = f'{slug} flow {name}'
+        if not flow.get('name'):
+            problems.append(f'{ident}: has no name.')
+        if name in names:
+            problems.append(f'{ident}: named twice.')
+        names.add(name)
+        if flow.get('setup') not in screen.get('setups', []):
+            problems.append(f"{ident}: its setup {flow.get('setup')!r} is not one of the screen's setups.")
+        if not flow.get('sees'):
+            problems.append(f'{ident}: says nothing it should show (`sees`).')
+        if flow.get('viewport', 'desk') not in ('desk', 'phone'):
+            problems.append(f'{ident}: viewport is desk or phone.')
+        steps = flow.get('steps') or []
+        if not steps:
+            problems.append(f'{ident}: has no steps.')
+        for n, step in enumerate(steps, 1):
+            acts = [k for k in step if k in STEP_VERBS and k != 'shot']
+            extra = set(step) - set(STEP_VERBS) - {'full_page', 'selector'}
+            if len(acts) > 1 or extra or not (acts or 'shot' in step):
+                problems.append(f'{ident} step {n}: one of {", ".join(STEP_VERBS)} (plus an optional shot).')
     return problems
 
 
@@ -144,14 +190,26 @@ def check_pages(app, config, screens, unregistered):
     return problems
 
 
-def check_finding(slug, finding):
+def check_finding(slug, finding, kind='review'):
     problems = []
     ident = f'{slug} finding {finding.get("id", "?")}'
     severity, outcome = finding.get('severity'), finding.get('outcome')
+    walkthrough = kind == 'walkthrough'
+    outcomes = OUTCOMES + (WALKTHROUGH_OUTCOMES if walkthrough else ())
     if severity not in SEVERITIES:
         problems.append(f'{ident}: severity must be one of {", ".join(SEVERITIES)} (SR9).')
-    if outcome not in OUTCOMES:
-        problems.append(f'{ident}: has no outcome; end it as {", ".join(OUTCOMES)} (SR12).')
+    if outcome not in outcomes:
+        problems.append(f'{ident}: has no outcome; end it as {", ".join(outcomes)} (SR12).')
+    if finding.get('origin', 'walkthrough' if walkthrough else 'review') not in ORIGINS:
+        problems.append(f'{ident}: origin is one of {", ".join(ORIGINS)}.')
+    caught = finding.get('caught_by')
+    if caught is not None and caught not in CAUGHT_BY:
+        problems.append(f'{ident}: caught_by is one of {", ".join(CAUGHT_BY)}.')
+    if walkthrough and caught is None:
+        problems.append(f'{ident}: a walkthrough finding says which layer should have caught it '
+                        f'(caught_by: {", ".join(CAUGHT_BY)}).')
+    if outcome == 'open' and not finding.get('doc'):
+        problems.append(f'{ident}: an open finding names the walkthrough doc that carries it.')
     if outcome == 'waived' and severity != 'minor':
         problems.append(f'{ident}: only a minor finding may be waived; fix it or make it Ben\'s call (SR12a).')
     if outcome in ('waived', 'ben', 'ruled') and not finding.get('reason'):
@@ -185,7 +243,10 @@ def check_records(app, config, screens):
         if not any(e.get('kind') == 'review' for e in entries):
             problems.append(f'{slug}: its record holds no review; a screen registers with one.')
             continue
-        latest = entries[-1]
+        for entry in entries:
+            if entry.get('kind') not in KINDS:
+                problems.append(f"{slug}: an entry's kind must be one of {', '.join(KINDS)}.")
+        latest = [e for e in entries if e.get('kind') in ('review', 'na')][-1]
         current = fingerprint(app, screen['templates'])
         if latest.get('fingerprint') != current:
             problems.append(f'{slug}: changed since its last review (fingerprint {current}, record has '
@@ -195,11 +256,9 @@ def check_records(app, config, screens):
                 problems.append(f'{slug}: an n/a entry needs its reason.')
             else:
                 notes.append(f'{slug}: n/a - {latest["reason"]}')
-        elif latest.get('kind') != 'review':
-            problems.append(f'{slug}: an entry\'s kind must be review or na.')
         for entry in entries:
             for finding in entry.get('finding', []):
-                problems.extend(check_finding(slug, finding))
+                problems.extend(check_finding(slug, finding, entry.get('kind')))
     return problems, notes
 
 

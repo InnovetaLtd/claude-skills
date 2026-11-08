@@ -1,144 +1,133 @@
 ---
 name: walkthrough
-description: Ben's live review of what was just built in an Innoveta app. Claude prepares a dev server on a throwaway database, seeds an example record and any upload documents for each change, and publishes a numbered checklist artifact; started from a phone over Remote Control, it runs in watch mode, where Claude walks each check itself and the checklist shows step pictures. Ben gives numbered feedback one item at a time ("Noted — slice: …") and Claude fixes trivial bugs live. At "review complete" everything is grouped into six slices, the open calls are ruled there and then, and a walkthrough doc is written that a fresh session can pick up cold. Use when Ben says "walkthrough", "let me review what's built", "load up the dev server and give me a list of items to check", or after an integration lands and before /deploy. NOT a critique of one screen (surface-review), NOT a bug-report pass, NOT a deploy gate.
+description: Ben's final review pass over what was built in an Innoveta app. Claude records every changed screen's flows (before and after), gathers what the build's own reviews found, and publishes one checklist artifact Ben can eyeball from a desk or a phone; at a desk he can also walk the work on a seeded dev server. His numbered feedback lands on each card as he gives it ("Noted — slice: …"), trivial bugs are fixed live, and at "review complete" every finding is grouped into six slices, ruled there and then, written into each screen's record with the layer that should have caught it, and handed off in a walkthrough doc a fresh session can pick up cold. Use when Ben says "walkthrough", "let me review what's built", "show me what's new", or after an integration lands and before /deploy. NOT a critique of one screen during a build (surface-review), NOT a bug-report pass, NOT a deploy gate.
 ---
 
-# Walkthrough: Ben walks what was built; Claude prepares, listens, then slices
+# Walkthrough: Ben's final eyeball over everything the build produced
 
-**Why this exists.** A green suite is not evidence a surface is right; the walkthrough is the human half of that
-rule. It spends Ben's review time on judging surfaces, not on hunting for data, typing test documents, or
-remembering what he said. Designed with Ben in Build Manager on 2026-10-23, after the first session run this way.
+**Why this exists.** The build reviews itself (the `surface-review` skill: lint, recorded flows, an independent
+reviewer, a gate on every merge). The walkthrough is the last pass, Ben's, and it is cheap for him: one artifact,
+every change pictured with its before, what the reviewers already found and fixed, and what is left for him.
+**Its second job is to teach the method:** every finding he makes is recorded with the layer that should have
+caught it, so the leaks are counted (`scripts/review_report.py`) and repeats are promoted until fewer reach him.
+Designed with Ben in Build Manager (2026-10-23; one pipeline with surface review since 2026-11-08).
 
-**App specifics live in the app's walkthrough appendix** (`docs/walkthrough-appendix.md`; template:
-`templates/walkthrough-appendix.md` in this plugin). It covers where the live SHA is recorded, how to build a
-throwaway database, the server command and sign-in, the seed command, the upload folder, the record locations, and
-the landing path. **No appendix ⇒ stop and offer to write one** from the app's dev docs; a walkthrough run blind
-guesses commands into somebody's real database.
+**The engine is the surface review's** (`standards/surface-review.md` §4): the app's `surface-review.toml` says how
+to prepare, seed and serve; its registry holds each screen's goal and flows; its records hold every finding. The
+app's **walkthrough appendix** (`docs/walkthrough-appendix.md`; template `templates/walkthrough-appendix.md`)
+adds only what a walkthrough needs beyond that: where the live SHA is, where intake and rulings docs live, the
+upload folder, the walkthrough doc's location, the landing path. **No `surface-review.toml` ⇒ run
+`surface-review-init` first; no appendix ⇒ offer to write one.** Never guess a command into a database.
 
-## 0. Desk or watch: decide before preparing
+## 1. Scope: what changed
 
-- **Watch mode when Ben started this from a remote device**: the harness says he is on Remote Control, or he says
-  he is on his phone or away from the desk. His phone cannot reach the walkthrough server, so **Claude walks every
-  check itself** and the checklist shows step pictures (§2b). If it is unclear, ask once.
-- **Desk mode otherwise**: Ben walks the checks himself on the walkthrough server.
-- **Both modes publish the checklist as an artifact** (§3): the checklist in one window, the app in another (desk
-  mode), and Claude in a third for feedback. Nobody scrolls the chat to find item 7.
+**Default: everything merged to master since the last deploy** (the live SHA: appendix). Read:
+- `git log <live>..origin/master --merges`: the PR titles, and each PR's body for its activator;
+- the *Fixed* tables of every bug-intake and rulings doc written since then;
+- every scope doc whose slices landed: **its scenarios are flows**, already registered on their screens.
 
-## 1. Scope: what gets a check
+**Argument:** a PR number, a doc, or a branch narrows it.
 
-**Default: everything merged to master since the last deploy.** Find the live SHA (appendix) and read:
-- the *Fixed* tables of every bug-intake and rulings doc written since then (appendix: where they live);
-- `git log <live>..origin/master --merges` for the PR titles, and each PR's body for its activator;
-- any scope doc whose slices landed in that range: **its scenarios are already seed setups**, walk those.
+**The screens:** those the range touched (`surface_record.py record --changed-since <live>` selects them as the
+lint does; if that falls back to every screen, narrow it with `--screens` to the ones the PRs name). **One check
+per user-visible change**; a check shows the walks of the screens it is about. Tooling, docs and tests get none.
 
-**Argument:** a PR number, a doc, or a branch narrows it to that.
+## 2. Record (all before Ben sees anything)
 
-**One check per user-visible change.** Merge several only when they sit on the same page and the same record.
-Tooling, docs and test-only changes get no check.
+1. **After:** `surface_record.py record --app . --changed-since <live> --stills --out <scratchpad>/after`. Every
+   registered flow on those screens, plus a desk and a phone picture of each screen's typical setup. For a
+   change that has no flow yet (a bug fix), add a one-off walk with `--plan` (the docstring has the shape),
+   seeded through the app's ONE seed command; where no setup shows it, **add the setup to that command**,
+   copying the fix's own regression test, so the next walkthrough and the next review have it too.
+2. **Before:** a worktree of the live SHA, then `record --app <that worktree> --same-as <scratchpad>/after/manifest.json
+   --label before --out <scratchpad>/before`. A scenario the change adds is not on the base: its walk shows *new*.
+3. **A walk that stopped is a finding** (its last picture shows where and why). Fix the walk if the walk was wrong;
+   otherwise it heads the checklist as finding #0, with any 375 px or dark-mode failure the lint reports for
+   these screens (`surface_lint.py --changed-since <live>`).
+4. **What the build already found:** for each screen, the findings in its record since the live SHA, with their
+   outcomes. They go on the card, folded: Ben sees what was caught without re-reading it.
+5. **What pictures cannot judge** (*feel*: a fiddly field, a drag, a tap, the camera) is marked `desk_only`: *walk
+   at a desk later*. The walkthrough doc lists every one as an owed desk check, so none is passed quietly.
+6. **Things that cannot work locally** (a cloud fetch, a real AI read, a sibling app) are named in the check's
+   *What you should see*, so a local failure is never mistaken for a bug.
+7. **Upload documents** a check needs are generated into the appendix's upload folder, named after their record.
+   **Ben never drafts a test document** (his words, 2026-10-23).
 
-## 2. Prepare (all before Ben sees anything)
+## 3. The checklist artifact
 
-1. **A walkthrough worktree** on `origin/master`, on a `walkthrough-<date>` branch. Every live fix (§3) lands here.
-2. **A throwaway database** built by the appendix's command into the scratchpad. **Ben's everyday dev database is
-   never seeded or migrated by this skill**, so nothing needs cleaning up afterwards.
-3. **The server** started from the worktree on a **measured** free port (sibling sessions hold ports; check before
-   you bind), signed in as Ben by the appendix's dev-user setting, with no auto-reload, and run as a background
-   process. Restart it after any template or code edit.
-4. **Seed one example per check through the real services.** Prefer the app's ONE seed command (the setup a scope
-   or surface review already registered). Where none exists, add a setup to that command rather than writing a
-   private script, copying the arrangement from the fix's own regression test. Make it idempotent and prefix every
-   row so it is obviously a check record. Choose the **data shapes** that make the change visible: batch as well as
-   serial, retired as well as live, two of something where the fix is about "more than one".
-5. **Prerequisite state first** (goods booked in, totals saved, a deposit confirmed). Each check must start at the
-   step Ben is meant to judge.
-6. **Upload documents:** any step that needs a file gets a realistic one generated into the appendix's upload
-   folder, named after its record (e.g. `CHK-B2 balance invoice PO-00029.pdf`). **Ben never drafts a test
-   document** (his words, 2026-10-23).
-7. **Pre-sweep at 375 px and in dark mode.** For every checklist URL, check that the page never scrolls sideways at
-   the mobile size and that it renders in the dark theme. Any failure is **finding #0**, reported with the
-   checklist. Ben then eyeballs desktop. Only phone-first surfaces carry a "check on a phone" step.
-8. **Things that cannot work locally** (a cloud API fetch, a real AI read, a call to a sibling app) are named in the
-   check's *What you should see*, so a local failure is never mistaken for a bug.
+Write `walk.json` (title, date, range, mode, server, finding #0, and per check: n · title · ids · the data shapes
+that matter · where · see · `walks` · `findings` · `desk_only`), then:
+1. `surface_record.py mark --after <after> --before <before>`: finds what visibly changed (rows aligned like a
+   text diff, so an insertion never lights up the page below it), keeps the boxes as coordinates, and writes the
+   clean `.jpg` each picture is uploaded as.
+2. `surface_record.py page --walk walk.json --after <after>/manifest.json --before <before>/manifest.json --out
+   <scratchpad>/walkthrough-<date>.html`, and **publish** it with `capabilities: {db: {}, assets: {}}` (the
+   `artifact-capabilities` skill holds the call shapes).
+3. **Upload the `.jpg` views** (`asset: true`, up to 25 per call), write `{view: url}` to `urls.json`, rebuild with
+   `--assets urls.json`, and republish the same file.
+4. **Send Ben the link** in one line. Before and after sit side by side, what changed is boxed on both as a layer
+   (the *Changes shown* switch hides it to show the true screen), and *no visible change* is badged.
 
-## 2b. Watch mode: record every check
+**Desk or phone.** Started from a remote device (the harness says Remote Control, or Ben says he is away), the
+artifact IS the walkthrough: he cannot reach the dev server. At a desk, also start a server on a seeded throwaway
+database (appendix; a measured free port, signed in as Ben, no auto-reload) so he can drive any check himself, and
+put its address in `server`. If it is unclear, ask once.
 
-1. **Write a plan per check**: the steps a user would take, ending at what Ben is judging, with a picture
-   (`shot`) at every step whose screen he needs to see, captioned in plain English with what it shows. Use the
-   phone viewport for phone-first screens and the desktop one otherwise. The plan format is in
-   `scripts/walkthrough_watch.py`'s docstring.
-2. **Record it**: `walkthrough_watch.py record plan.json --out <scratchpad>/shots`, with the Python the appendix
-   names (it needs Playwright). **A check that stopped is a finding:** its last picture shows where and why. Fix
-   the plan if the plan was wrong; otherwise it goes on the checklist as it is, under finding #0.
-3. **Mark what pictures cannot judge**: a check whose point is *feel* (typing into a fiddly field, a drag, a tap
-   target, the camera) gets `desk_only`. Its card says *walk at a desk later*, and the walkthrough doc lists it as
-   an owed desk check, so it is never quietly passed.
-4. **Re-recording**: after a live fix, record that one check again and republish (§3), then say "fixed: see #n".
+## 4. The walk
 
-## 3. The checklist artifact and the walk
+- **Each feedback item gets one line:** `Noted — slice: <slice name>` (§5), and the same note on its card: write
+  `checks/c<n>` (`{n, state, slice, note}`; state `noted`, `ok`, `fixed`, `recheck` or `regression`) with the
+  `ArtifactData` tool. Nothing else in chat. Don't argue, propose or summarise.
+- **A direct question gets a full answer, grounded in the code.** Never from memory. Record it as a finding if the
+  answer exposes a gap.
+- **Speak up unasked only on a clearly large error**: a misreading of what the app does, or a request that breaks a
+  standing rule (its CLAUDE.md, its ADRs). Two lines, then back to *Noted*.
+- **Fix trivial bugs live** (a one-line defect, no product judgement) in a walkthrough worktree on `origin/master`:
+  red test first, fix, re-record that check, republish, then "fixed: see #n". Anything bigger is only recorded.
+- **Seed or record on request:** if Ben wants another state or another step, add the walk, record it, republish.
 
-**Build the checklist as an artifact page**, from `templates/walkthrough-checklist.html`, by
-`walkthrough_watch.py page walk.json --out <scratchpad>/walkthrough-<date>.html` (`walk.json`: title, date, range,
-mode, server, finding #0, and per check its number, title, ids, the data shapes that matter, where, and what you
-should see; watch mode adds `--manifest`). Then:
-1. **Publish** it with `capabilities: {db: {}, assets: {}}` (the `artifact-capabilities` skill holds the call shapes).
-2. **Watch mode: upload the pictures** to the artifact's assets (`asset: true`, up to 25 files per call), write
-   `{file: url}` to `urls.json`, rebuild with `--assets urls.json`, and republish the same file.
-3. **Send Ben the link** with a one-line note on how to use it. Desk mode's links point at the walkthrough
-   server; watch mode's pictures open full size when tapped.
-4. **Notes go to the artifact's database, not into the page**: as each feedback item lands, write `checks/c<n>`
-   (`{n, state, slice, note}`; state is `noted`, `ok`, `fixed`, `recheck` or `regression`) with the `ArtifactData`
-   tool. The card updates while Ben watches. At "review complete", write `meta/summary` (`{phase: "complete",
-   slices: [{name, items}], rulings, doc}`).
-
-Order the checks with bug fixes on seeded records first, then checks on existing pages. Save the same table into
-the walkthrough doc (§5); the artifact is Ben's view, **the doc stays the record** a fresh session reads.
-
-**During the walk:**
-- **Each feedback item gets one line:** `Noted — slice: <slice name>` (§4), and the same note on its card (§3.4).
-  Nothing else. Don't argue, propose or summarise.
-- **A direct question gets a full answer, grounded in the code.** Read it; never answer from memory. Record the
-  question as a finding if the answer exposes a gap.
-- **Speak up unasked only on a clearly large error.** That means a factual misreading of what the app does (thinking
-  a built thing is missing, or the reverse), or a request that would break a standing rule of the app (its
-  CLAUDE.md, its ADRs). Say it in two lines, then go back to *Noted*.
-- **Fix trivial bugs live:** an obvious one-line defect with no product judgement (a missing dropdown option, a
-  wrong label). Write the red test first in the walkthrough worktree, fix, restart the server, then tell Ben
-  "fixed: re-check #n". Anything bigger is only recorded.
-- **Seed on request:** if Ben needs a record or a document mid-walk, make it (§2.4–2.6) and say where it is.
-
-## 4. "Review complete": six slices
-
-Group every finding (numbered by checklist item) into:
+## 5. "Review complete": six slices, then the record
 
 | Slice | What goes in it |
 |---|---|
-| **0 · Regressions** | Anything now WORSE than before the change, including a change that undid something Ben once asked for (check `git log -S` and the bug history). Flagged against the next deploy. |
-| **1 · Plain bugs** | Behaviour wrong by an existing rule; no design needed. The live fixes are listed here as *fixed*. |
-| **2 · Functional changes** | Behaviour Ben described in his own words (e.g. "the X-ray sheet reads the HV sheet itself"). Buildable as stated. |
+| **0 · Regressions** | Anything now WORSE than before (the before/after pairs are the first place to look), including a change that undid something Ben once asked for (`git log -S`, the bug history). Flagged against the next deploy. |
+| **1 · Plain bugs** | Wrong by an existing rule; no design needed. The live fixes are listed here as *fixed*. |
+| **2 · Functional changes** | Behaviour Ben described in his own words. Buildable as stated. |
 | **3 · Needs a ruling** | Two or more real options. |
-| **4 · Surface reviews** | "This page needs a review": one row per screen, with what he said about it as the review's seed. Run by `surface-review`. |
+| **4 · Surface reviews** | "This page needs a review": one row per screen, his words as the review's seed. |
 | **5 · Parked** | Mentioned but not wanted now. Goes to the ideas board. |
 
-**Then rule slice 3 straight away.** Ask in batches of up to four, recommendation first, options in plain English
-with what he would see, written to `standards/examples-first.md`. A ruled item moves to slice 1 or 2 (or 5).
-Don't write the doc until the rulings are in.
+**Rule slice 3 straight away**: batches of up to four, recommendation first, options as what he would see
+(`standards/examples-first.md`). A ruled item moves to slice 1, 2 or 5. Then write `meta/summary` (`{phase:
+"complete", slices: [{name, items}], rulings, doc}`) so the artifact shows the outcome.
 
-## 5. Persist and hand off
+**Then record every finding on its screen** (standard §4, *Records*): one `kind = "walkthrough"` entry per screen,
+dated, one `[[entry.finding]]` each with `severity`, `outcome` (`fixed` for a live fix, `open` + `doc` for one
+sent to a slice, `parked`, or `ben`/`ruled` with its reason), `what`, and **`caught_by`: the layer that should
+have caught it** (`scope` a scenario was missing · `canon` a shared component or rule was missing · `review` the
+reviewer should have seen it · `lint` it is measurable · `test` a test should pin it · `taste` only Ben could say).
+Add `row` (the friction-checklist line) or `component` where one applies: those are what the report counts as
+repeats. A finding on no registered screen goes in the walkthrough doc only.
 
-1. **The walkthrough doc** (appendix: its location), written for a fresh session that never saw this chat. It
-   holds the checklist table; the slices, each with its findings, the screens it touches and what done looks
-   like; the rulings taken; and the walkthrough branch's live fixes with their tests.
-2. **One ledger line** pointing at the doc, with the app's not-yet-built marker, plus one index row (appendix).
-3. **Parked items** go to the ideas board.
-4. **Live fixes:** run the full suite on the walkthrough branch and the app's record checks, then land it by the
+## 6. Persist and hand off
+
+1. **The walkthrough doc** (appendix: its location), for a fresh session that never saw this chat: the checklist,
+   the slices (findings, screens, what done looks like), the rulings, the live fixes and their tests, the owed
+   desk checks, and the artifact's link.
+2. **Run `review_report.py --app .`** and put its *leak* line and any *promote* rows in the doc. **A promote row
+   becomes a slice-1 or slice-2 item** in the layer it names (a catalogue component, a checklist line, a lint rule,
+   a ratchet). That is how the method improves.
+3. **One ledger line** pointing at the doc with the app's not-yet-built marker, one index row, parked items to the
+   ideas board (appendix).
+4. **Live fixes and the records** land together: full suite, the app's record checks and the gate, then the
    appendix's landing path. No deploy.
-5. **One new-session card per slice**, each brief naming the doc and its slice. Slice 4 gets one card per screen.
-   Slice 0 is marked as wanting attention before the next deploy.
-6. **Stop the server** (by its process id, after checking its command line) and close its browser tab. The worktree
-   and its throwaway database go once the landing merges.
+5. **One new-session card per slice**, each brief naming the doc and its slice; slice 4 one per screen; slice 0
+   marked for attention before the next deploy.
+6. **Stop any server** you started (by its process id, after checking its command line). The worktrees go once
+   the landing merges.
 
 ## Pairs with
 
-- **`scope`**: a scope's scenarios are seed setups, so a walkthrough after a scoped build walks Ben's own examples.
-- **`surface-review`**: slice 4's sessions run it.
+- **`scope`**: its scenarios become flows (slice 0), so the build, the reviewer and Ben all walk Ben's examples.
+- **`surface-review`**: the same engine during the build; slice 4's sessions run it.
 - **`deploy`**: runs after; slice 0 is the one to read before pressing it.
