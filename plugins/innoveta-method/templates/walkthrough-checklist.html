@@ -1,0 +1,258 @@
+<title>__WALK_TITLE__</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Layout: a sticky strip of check numbers (each coloured by its state) over one column of check
+   cards; the step pictures run down the card on a phone and across it at a desk. */
+:root {
+  --bg: #f3f5f7; --surface: #ffffff; --ink: #18222d; --muted: #566472; --line: #d5dce3;
+  --accent: #1d5c86; --accent-soft: #e2edf5;
+  --ok: #1f7a4a; --ok-soft: #e1f2e8; --noted: #1d5c86; --noted-soft: #e2edf5;
+  --fixed: #0f6f6a; --fixed-soft: #dcf1ef; --recheck: #8a5a00; --recheck-soft: #fbefd6;
+  --bad: #a3262a; --bad-soft: #f8e1e1;
+  --f-body: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #11171d; --surface: #1a222b; --ink: #e4eaf0; --muted: #9aa8b5; --line: #2c3742;
+  --accent: #7db8e0; --accent-soft: #1d3142;
+  --ok: #6fcf97; --ok-soft: #173326; --noted: #7db8e0; --noted-soft: #1d3142;
+  --fixed: #5fd0c6; --fixed-soft: #143331; --recheck: #f0c264; --recheck-soft: #3a2e14;
+  --bad: #f08a8d; --bad-soft: #3d1c1e; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #11171d; --surface: #1a222b; --ink: #e4eaf0; --muted: #9aa8b5; --line: #2c3742;
+  --accent: #7db8e0; --accent-soft: #1d3142;
+  --ok: #6fcf97; --ok-soft: #173326; --noted: #7db8e0; --noted-soft: #1d3142;
+  --fixed: #5fd0c6; --fixed-soft: #143331; --recheck: #f0c264; --recheck-soft: #3a2e14;
+  --bad: #f08a8d; --bad-soft: #3d1c1e; color-scheme: dark }
+
+body { background: var(--bg); color: var(--ink); font: 16px/1.5 var(--f-body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+.wrap { max-width: 980px; margin: 0 auto; padding-block: 20px 48px; display: grid; gap: 20px; }
+h1, h2, h3 { text-wrap: balance; margin: 0; line-height: 1.2; }
+h1 { font-size: 1.6rem; }
+h2 { font-size: 1.2rem; }
+h3 { font-size: 1.05rem; }
+p { margin: 0; }
+.mono { font-family: var(--f-mono); font-size: .82rem; }
+.muted { color: var(--muted); }
+
+header.head { display: grid; gap: 8px; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px 16px; color: var(--muted); font-size: .92rem; }
+.pill { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; border-radius: 999px;
+  font-size: .8rem; font-weight: 700; letter-spacing: .02em; background: var(--accent-soft); color: var(--accent); }
+.progress { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+.progress > i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .3s; }
+@media (prefers-reduced-motion: reduce) { .progress > i { transition: none; } }
+
+nav.strip { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg);
+  padding-block: 8px; border-bottom: 1px solid var(--line); overflow-x: auto; }
+nav.strip ol { list-style: none; margin: 0; padding: 0; display: flex; gap: 6px; }
+nav.strip a { display: grid; place-items: center; min-width: 40px; height: 40px; border-radius: 8px;
+  font: 700 .9rem var(--f-mono); text-decoration: none; color: var(--ink); background: var(--surface);
+  border: 1px solid var(--line); }
+nav.strip a:focus-visible, a:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.state-open { }
+.state-noted { --st: var(--noted); --st-soft: var(--noted-soft); }
+.state-ok { --st: var(--ok); --st-soft: var(--ok-soft); }
+.state-fixed { --st: var(--fixed); --st-soft: var(--fixed-soft); }
+.state-recheck { --st: var(--recheck); --st-soft: var(--recheck-soft); }
+.state-regression { --st: var(--bad); --st-soft: var(--bad-soft); }
+nav.strip a[class*="state-"]:not(.state-open) { background: var(--st-soft); color: var(--st); border-color: var(--st); }
+
+.zero { border: 1px solid var(--bad); background: var(--bad-soft); color: var(--ink); border-radius: 10px; padding: 14px 16px; display: grid; gap: 6px; }
+.zero h2 { color: var(--bad); font-size: 1rem; }
+.zero ul { margin: 0; padding-left: 20px; }
+
+article.check { background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+  padding: 16px; display: grid; gap: 12px; scroll-margin-top: 72px; min-width: 0; }
+.check-top { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; align-items: start; }
+.num { font: 700 1.5rem/1 var(--f-mono); color: var(--accent); grid-row: span 2; padding-top: 2px; }
+.ids { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font: 500 .75rem var(--f-mono); padding: 1px 8px; border-radius: 6px; border: 1px solid var(--line); color: var(--muted); }
+.chip.shape { border-color: var(--accent); color: var(--accent); }
+.chip.desk { border-color: var(--recheck); color: var(--recheck); }
+.see { display: grid; gap: 4px; }
+.see b { font-size: .78rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.where { font-size: .9rem; overflow-wrap: anywhere; }
+
+ol.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; grid-template-columns: 1fr; counter-reset: step; }
+@media (min-width: 760px) { ol.steps.many { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+ol.steps li { display: grid; gap: 6px; min-width: 0; counter-increment: step; }
+ol.steps figure { margin: 0; display: grid; gap: 6px; }
+ol.steps img { width: 100%; max-width: 100%; height: auto; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); }
+ol.steps figcaption { font-size: .92rem; }
+ol.steps figcaption::before { content: counter(step) ". "; font: 700 .85rem var(--f-mono); color: var(--accent); }
+.stopped figcaption { color: var(--bad); font-weight: 700; }
+
+.verdict { border-top: 1px solid var(--line); padding-top: 10px; display: grid; gap: 4px; }
+.verdict .pill { justify-self: start; background: var(--st-soft, var(--accent-soft)); color: var(--st, var(--muted)); }
+.verdict .note { white-space: pre-wrap; }
+
+section.summary { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px; display: grid; gap: 14px; }
+.slices { display: grid; gap: 12px; grid-template-columns: 1fr; }
+@media (min-width: 760px) { .slices { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.slice { display: grid; gap: 4px; min-width: 0; }
+.slice ul { margin: 0; padding-left: 20px; }
+.status-line { font-size: .85rem; color: var(--muted); }
+</style>
+
+<div class="wrap">
+  <header class="head">
+    <h1 id="title"></h1>
+    <div class="meta" id="meta"></div>
+    <div class="progress" aria-hidden="true"><i id="bar"></i></div>
+    <p class="status-line" id="live" role="status" aria-live="polite">Your notes appear on each check as you give them.</p>
+  </header>
+  <nav class="strip" aria-label="Checks"><ol id="strip"></ol></nav>
+  <section class="zero" id="zero" hidden><h2>Finding #0: failed the phone or dark-mode sweep</h2><ul id="zero-list"></ul></section>
+  <section class="summary" id="summary" hidden></section>
+  <div id="checks" style="display:grid;gap:16px"></div>
+</div>
+
+<script id="walk-data" type="application/json">__WALK_DATA__</script>
+<script>
+(function () {
+  "use strict";
+  var data = JSON.parse(document.getElementById("walk-data").textContent);
+  var notes = {};          // check number -> {state, slice, note}, live from the db when it answers
+  var summary = null;
+  var STATE_WORDS = { open: "To check", noted: "Noted", ok: "Looks right", fixed: "Fixed: re-check", recheck: "Re-check", regression: "Regression" };
+
+  function el(tag, attrs, text) {
+    var n = document.createElement(tag);
+    if (attrs) Object.keys(attrs).forEach(function (k) { if (attrs[k] != null) n.setAttribute(k, attrs[k]); });
+    if (text != null) n.textContent = text;
+    return n;
+  }
+  function stateOf(c) { var n = notes[c.n]; return (n && n.state) || c.state || "open"; }
+
+  function renderHead() {
+    document.getElementById("title").textContent = data.title;
+    var meta = document.getElementById("meta");
+    meta.textContent = "";
+    var mode = data.mode === "watch" ? "Watch mode: recorded by Claude" : "Desk mode: walk it on " + (data.server || "the walkthrough server");
+    meta.appendChild(el("span", { "class": "pill" }, mode));
+    if (data.date) meta.appendChild(el("span", null, data.date));
+    if (data.range) meta.appendChild(el("span", null, data.range));
+    var done = data.checks.filter(function (c) { return stateOf(c) !== "open"; }).length;
+    meta.appendChild(el("span", null, done + " of " + data.checks.length + " checked"));
+    document.getElementById("bar").style.width = (data.checks.length ? 100 * done / data.checks.length : 0) + "%";
+    var zero = data.finding0 || [];
+    document.getElementById("zero").hidden = !zero.length;
+    var zl = document.getElementById("zero-list"); zl.textContent = "";
+    zero.forEach(function (z) { zl.appendChild(el("li", null, z)); });
+  }
+
+  function renderStrip() {
+    var ol = document.getElementById("strip"); ol.textContent = "";
+    data.checks.forEach(function (c) {
+      var li = el("li");
+      var a = el("a", { href: "#c" + c.n, "class": "state-" + stateOf(c), "aria-label": "Check " + c.n + ": " + STATE_WORDS[stateOf(c)] }, String(c.n));
+      li.appendChild(a); ol.appendChild(li);
+    });
+  }
+
+  function renderCheck(c) {
+    var art = el("article", { "class": "check state-" + stateOf(c), id: "c" + c.n });
+    var top = el("div", { "class": "check-top" });
+    top.appendChild(el("span", { "class": "num", "aria-hidden": "true" }, String(c.n)));
+    top.appendChild(el("h2", null, c.title));
+    var ids = el("div", { "class": "ids" });
+    (c.ids || []).forEach(function (i) { ids.appendChild(el("span", { "class": "chip" }, i)); });
+    (c.shapes || []).forEach(function (s) { ids.appendChild(el("span", { "class": "chip shape" }, s)); });
+    if (c.desk_only && data.mode === "watch") ids.appendChild(el("span", { "class": "chip desk" }, "walk at a desk later"));
+    top.appendChild(ids);
+    art.appendChild(top);
+
+    if (c.see) {
+      var see = el("div", { "class": "see" });
+      see.appendChild(el("b", null, data.mode === "watch" ? "What you should see" : "What to do and what you should see"));
+      see.appendChild(el("p", null, c.see));
+      art.appendChild(see);
+    }
+    if (c.where) {
+      var w = el("p", { "class": "where muted" });
+      if (data.mode !== "watch" && /^https?:/.test(c.where)) { w.appendChild(el("a", { href: c.where, target: "_blank", rel: "noopener" }, c.where)); }
+      else { w.appendChild(el("span", { "class": "mono" }, c.where)); }
+      art.appendChild(w);
+    }
+    var shots = c.shots || [];
+    if (shots.length) {
+      var ol = el("ol", { "class": "steps" + (shots.length > 1 ? " many" : "") });
+      shots.forEach(function (s) {
+        var li = el("li", s.stopped ? { "class": "stopped" } : null);
+        var fig = el("figure");
+        if (s.url) {
+          var a = el("a", { href: s.url, target: "_blank", rel: "noopener" });
+          a.appendChild(el("img", { src: s.url, alt: s.caption, loading: "lazy" }));
+          fig.appendChild(a);
+        } else {
+          fig.appendChild(el("p", { "class": "muted" }, "Picture uploading…"));
+        }
+        fig.appendChild(el("figcaption", null, s.caption));
+        li.appendChild(fig); ol.appendChild(li);
+      });
+      art.appendChild(ol);
+    }
+    var n = notes[c.n] || {};
+    var v = el("div", { "class": "verdict" });
+    v.appendChild(el("span", { "class": "pill" }, STATE_WORDS[stateOf(c)] + (n.slice ? " · " + n.slice : "")));
+    if (n.note) v.appendChild(el("p", { "class": "note" }, n.note));
+    art.appendChild(v);
+    return art;
+  }
+
+  function renderChecks() {
+    var box = document.getElementById("checks"); box.textContent = "";
+    data.checks.forEach(function (c) { box.appendChild(renderCheck(c)); });
+  }
+
+  function renderSummary() {
+    var s = document.getElementById("summary");
+    if (!summary || summary.phase !== "complete") { s.hidden = true; return; }
+    s.hidden = false; s.textContent = "";
+    s.appendChild(el("h2", null, "Review complete"));
+    var grid = el("div", { "class": "slices" });
+    (summary.slices || []).forEach(function (sl) {
+      var d = el("div", { "class": "slice" });
+      d.appendChild(el("h3", null, sl.name));
+      var ul = el("ul");
+      (sl.items || []).forEach(function (i) { ul.appendChild(el("li", null, i)); });
+      if (!(sl.items || []).length) ul.appendChild(el("li", { "class": "muted" }, "None"));
+      d.appendChild(ul); grid.appendChild(d);
+    });
+    s.appendChild(grid);
+    if ((summary.rulings || []).length) {
+      s.appendChild(el("h3", null, "Your rulings"));
+      var ul = el("ul");
+      summary.rulings.forEach(function (r) { ul.appendChild(el("li", null, r)); });
+      s.appendChild(ul);
+    }
+    if (summary.doc) s.appendChild(el("p", { "class": "muted mono" }, "Written up in " + summary.doc));
+  }
+
+  function renderAll() { renderHead(); renderStrip(); renderSummary(); renderChecks(); }
+  renderAll();
+
+  // Live notes: Claude writes checks/c<n> and meta/summary as Ben talks; the page only reads.
+  if (!window.claude || !window.claude.use) return;
+  var live = document.getElementById("live");
+  window.claude.use("db").then(function (db) {
+    if (!db) { live.textContent = "Notes are added to this page when Claude republishes it."; return; }
+    var timer = setTimeout(function () { live.textContent = "Can't reach the notes yet; they will appear when the connection returns."; }, 10000);
+    function settled(snap) { if (!snap.metadata.fromCache) { clearTimeout(timer); live.textContent = "Live: your notes appear on each check as you give them."; } }
+    db.collection("checks").onSnapshot(function (snap) {
+      notes = {};
+      snap.docs.forEach(function (d) { var b = d.data(); if (b && b.n != null) notes[b.n] = b; });
+      settled(snap); renderAll();
+    }, function () { clearTimeout(timer); live.textContent = "Live notes stopped; reload the page to see the latest."; });
+    db.doc("meta/summary").onSnapshot(function (snap) {
+      summary = snap.exists ? snap.data() : null; settled(snap); renderAll();
+    }, function () {});
+  });
+})();
+</script>
