@@ -3,6 +3,7 @@
 
     python surface_record.py record --app <repo root> (--screens a,b | --changed-since REF | --all)
                              --out <dir> [--plan plan.json] [--stills] [--channel msedge|chromium]
+    python surface_record.py mark --after <dir> [--before <dir>]
     python surface_record.py page --walk walk.json --after <dir>/manifest.json
                              [--before <dir>/manifest.json] [--assets urls.json] --out page.html
 
@@ -36,7 +37,9 @@ where, captioned with the reason, and the next walk starts (exit 1 names every s
 shows (`walks: ["screen/flow"]`). With `--before` (the same walks recorded on the base, e.g. the live
 SHA in a worktree: `record --app <base worktree> --same-as <after>/manifest.json --label before`, so it
 walks exactly what the after run walked and its files never share a name), each picture is paired with its before; byte-identical pictures say *no visible
-change* instead. `--assets` swaps file names for the artifact's uploaded URLs. `record` needs
+change* instead. `mark` (Pillow) finds what changed on both, rows aligned like a text diff so an
+insertion does not light up the page below it; the page draws those boxes as a layer Ben can switch off.
+It also writes the JPEG each picture is uploaded as (the recorder keeps lossless PNG for the diff). `--assets` swaps file names for the artifact's uploaded URLs. `record` needs
 Playwright; `page` is stdlib only.
 """
 import argparse
@@ -117,8 +120,8 @@ def record_walks(walks, urls, base, cfg, channel, out, theme, label=''):
             shots = []
 
             def shoot(caption, step, stopped=False):
-                name = f'{label + "-" if label else ""}w{i:03d}-{len(shots) + 1}.jpg'
-                opts = {'path': str(out / name), 'type': 'jpeg', 'quality': 80}
+                name = f'{label + "-" if label else ""}w{i:03d}-{len(shots) + 1}.png'
+                opts = {'path': str(out / name), 'type': 'png'}
                 if step.get('selector'):
                     page.locator(step['selector']).first.screenshot(**opts)
                 else:
@@ -219,6 +222,159 @@ def record(opts):
     return 1 if stopped else 0
 
 
+# ---------------------------------------------------------------------------------------------
+# mark: find what visibly changed, on the after AND the before
+# ---------------------------------------------------------------------------------------------
+#
+# A plain pixel diff lights up everything below an insertion (the page shifts down). So the rows are
+# aligned first, the way a text diff aligns lines (difflib, on each row's colours coarsened so the
+# browser's text-smoothing noise does not split a row; colour, not grey, so a red band and a teal band of
+# the same lightness never pass for each other, which is also why the recorder keeps PNG: a
+# JPEG re-encodes a shifted block differently). A band only the after has was ADDED, a band only the
+# before has was REMOVED, and a band on both is compared row against row, counting only a pixel that
+# moved by more than NOISE (two runs of the same page differ by up to ~32 grey levels: measured on
+# Build Manager's acknowledgement, 2026-11-08). Specks under MIN_AREA go; nearby boxes merge.
+# The boxes are kept as COORDINATES, never drawn into the picture: the page lays them over it as a
+# layer Ben can switch off to see the true screen (Ben, 2026-11-08).
+
+NOISE = 64                    # grey levels: a pixel that moved less than this is rendering noise
+KEY_SHIFT = 5                 # alignment key: each colour channel >> 5 (8 levels)
+MIN_AREA = 24                 # px: a box smaller than this is a speck, not a change
+MERGE_GAP = 12                # px: boxes this close are one change
+
+
+def _rows(img):
+    """The picture's rows as grey bytes."""
+    grey = img.convert('L')
+    raw, w = grey.tobytes(), grey.width
+    return [raw[y * w:(y + 1) * w] for y in range(grey.height)]
+
+
+def _keys(img):
+    """Each row's alignment key: its colours, coarsened."""
+    rgb = img.convert('RGB')
+    raw, w = rgb.tobytes(), rgb.width * 3
+    return [bytes(v >> KEY_SHIFT for v in raw[y * w:(y + 1) * w]) for y in range(rgb.height)]
+
+
+def _differs(row, other):
+    """(first, last) column where the rows differ by more than NOISE; against no other row, where
+    the row differs from its own leftmost pixel (the content of an added or removed band)."""
+    if other is None:
+        bg = row[0]
+        cols = [x for x in range(len(row)) if abs(row[x] - bg) > NOISE]
+    else:
+        cols = [x for x in range(min(len(row), len(other))) if abs(row[x] - other[x]) > NOISE]
+    return (cols[0], cols[-1]) if cols else None
+
+
+def _boxes(rows, y0, others=None):
+    """Boxes over the rows that differ, one per run of differing rows."""
+    boxes, run = [], None
+    for n, row in enumerate(rows):
+        hit = _differs(row, others[n] if others is not None else None)
+        if hit:
+            run = [min(run[0], hit[0]), run[1], max(run[2], hit[1]), y0 + n] if run else [hit[0], y0 + n, hit[1], y0 + n]
+        elif run:
+            boxes.append(tuple(run))
+            run = None
+    if run:
+        boxes.append(tuple(run))
+    return boxes
+
+
+def _paired(rows_a, ja, rows_b, ib):
+    """A band both pictures have: pair its rows top-aligned or bottom-aligned, whichever differs less,
+    and treat the rows left over on the longer side as added or removed."""
+    h = min(len(rows_a), len(rows_b))
+    best = None
+    for da, db in {(0, 0), (len(rows_a) - h, len(rows_b) - h)}:
+        on_a = _boxes(rows_a[da:da + h], ja + da, rows_b[db:db + h])
+        on_b = _boxes(rows_b[db:db + h], ib + db, rows_a[da:da + h])
+        area = sum((b[2] - b[0] + 1) * (b[3] - b[1] + 1) for b in on_a)
+        if best is None or area < best[0]:
+            extra_a = _boxes(rows_a[:da], ja) + _boxes(rows_a[da + h:], ja + da + h)
+            extra_b = _boxes(rows_b[:db], ib) + _boxes(rows_b[db + h:], ib + db + h)
+            best = (area, on_a + extra_a, on_b + extra_b)
+    return best[1], best[2]
+
+
+def _merge(boxes):
+    merged = []
+    for box in sorted((b for b in boxes if (b[2] - b[0] + 1) * (b[3] - b[1] + 1) >= MIN_AREA), key=lambda b: b[1]):
+        if merged and box[1] - merged[-1][3] <= MERGE_GAP:
+            last = merged[-1]
+            merged[-1] = (min(last[0], box[0]), last[1], max(last[2], box[2]), max(last[3], box[3]))
+        else:
+            merged.append(box)
+    return merged
+
+
+def changed_boxes(after_img, before_img):
+    """([boxes on the after], [boxes on the before]), each box (x0, y0, x1, y1) in pixels."""
+    import difflib
+    if after_img.width != before_img.width:
+        return ([(0, 0, after_img.width - 1, after_img.height - 1)],
+                [(0, 0, before_img.width - 1, before_img.height - 1)])
+    rows_a, rows_b = _rows(after_img), _rows(before_img)
+    keys_a, keys_b = _keys(after_img), _keys(before_img)
+    on_after, on_before = [], []
+    for op, i1, i2, j1, j2 in difflib.SequenceMatcher(None, keys_b, keys_a, autojunk=False).get_opcodes():
+        if op == 'replace':
+            a, b = _paired(rows_a[j1:j2], j1, rows_b[i1:i2], i1)
+            on_after += a
+            on_before += b
+        elif op == 'insert':
+            on_after += _boxes(rows_a[j1:j2], j1)
+        elif op == 'delete':
+            on_before += _boxes(rows_b[i1:i2], i1)
+    return _merge(on_after), _merge(on_before)
+
+
+def _as_share(boxes, img):
+    """Boxes as fractions of the picture, so the page can lay them over it at any width."""
+    w, h = img.width, img.height
+    return [[round(x0 / w, 5), round(y0 / h, 5), round((x1 + 1) / w, 5), round((y1 + 1) / h, 5)]
+            for x0, y0, x1, y1 in boxes]
+
+
+def mark(after_dir, before_dir=None):
+    """Find what changed and record it in the manifests: `boxes` (fractions of the picture) on each
+    changed shot, after and before, and `changes` on the after. Also write each picture's `view`: the
+    JPEG it is uploaded as (clean: the boxes are a layer on the page, never in the picture)."""
+    from PIL import Image
+    after = json.loads((after_dir / 'manifest.json').read_text(encoding='utf-8'))
+    before = json.loads((before_dir / 'manifest.json').read_text(encoding='utf-8')) if before_dir else {'walks': []}
+    before_walks = {w['key']: w for w in before['walks']}
+
+    def view(folder, shot):
+        if 'file' not in shot:
+            return
+        name = Path(shot['file']).stem + '.jpg'
+        Image.open(folder / shot['file']).convert('RGB').save(folder / name, 'JPEG', quality=80)
+        shot['view'] = name
+
+    marked = 0
+    for walk in after['walks']:
+        then = before_walks.get(walk['key'], {}).get('shots', [])
+        for n, shot in enumerate(walk['shots']):
+            old = then[n] if n < len(then) else None
+            if old and 'file' in shot and 'file' in old and old['sha256'] != shot['sha256']:
+                new_img, old_img = Image.open(after_dir / shot['file']), Image.open(before_dir / old['file'])
+                on_after, on_before = changed_boxes(new_img, old_img)
+                shot['boxes'], old['boxes'] = _as_share(on_after, new_img), _as_share(on_before, old_img)
+                shot['changes'] = max(len(on_after), len(on_before))
+                marked += 1
+            view(after_dir, shot)
+            if old:
+                view(before_dir, old)
+    (after_dir / 'manifest.json').write_text(json.dumps(after, indent=1), encoding='utf-8')
+    if before_dir:
+        (before_dir / 'manifest.json').write_text(json.dumps(before, indent=1), encoding='utf-8')
+    print(f'marked {marked} changed picture(s); upload the .jpg views')
+    return 0
+
+
 def build_page(walk, after, before=None, assets=None):
     """The checklist page: walk.json's checks, each with its walks' pictures (paired with BEFORE)."""
     assets = assets or {}
@@ -235,11 +391,13 @@ def build_page(walk, after, before=None, assets=None):
                 check.setdefault('see', got['sees'])
             then = before_walks.get(key, {}).get('shots', [])
             for n, shot in enumerate(got['shots']):
-                pair = dict(shot, url=assets.get(shot['file']))
+                pair = dict(shot, url=assets.get(shot.get('view') or shot.get('file')))
                 if key in before_walks:
                     old = then[n] if n < len(then) else None
                     pair['same'] = bool(old) and old['sha256'] == shot['sha256']
-                    pair['before_url'] = assets.get(old['file']) if old and not pair['same'] else None
+                    pair['before_url'] = (assets.get(old.get('view') or old['file'])
+                                          if old and not pair['same'] else None)
+                    pair['before_boxes'] = old.get('boxes', []) if old and not pair['same'] else []
                 elif before is not None:
                     pair['new'] = True
                 shots.append(pair)
@@ -268,6 +426,9 @@ def main(argv=None):
     r.add_argument('--theme', default='light', choices=('light', 'dark'))
     r.add_argument('--port', type=int)
     r.add_argument('--label', default='', help='prefix for picture names (`before`), so two runs upload side by side')
+    m = sub.add_parser('mark')
+    m.add_argument('--after', type=Path, required=True, help='the after run folder')
+    m.add_argument('--before', type=Path, help='the before run folder')
     p = sub.add_parser('page')
     p.add_argument('--walk', type=Path, required=True)
     p.add_argument('--after', type=Path, required=True)
@@ -279,6 +440,8 @@ def main(argv=None):
         sys.stdout.reconfigure(encoding='utf-8', errors='replace')
     if opts.cmd == 'record':
         return record(opts)
+    if opts.cmd == 'mark':
+        return mark(opts.after, opts.before)
     load = lambda path: json.loads(path.read_text(encoding='utf-8')) if path else None
     opts.out.write_text(build_page(load(opts.walk), load(opts.after), load(opts.before), load(opts.assets)),
                         encoding='utf-8')

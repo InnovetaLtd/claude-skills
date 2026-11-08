@@ -57,12 +57,16 @@ per user-visible change**; a check shows the walks of the screens it is about. T
 
 Write `walk.json` (title, date, range, mode, server, finding #0, and per check: n · title · ids · the data shapes
 that matter · where · see · `walks` · `findings` · `desk_only`), then:
-1. `surface_record.py page --walk walk.json --after <after>/manifest.json --before <before>/manifest.json --out
+1. `surface_record.py mark --after <after> --before <before>`: finds what visibly changed (rows aligned like a
+   text diff, so an insertion never lights up the page below it), keeps the boxes as coordinates, and writes the
+   clean `.jpg` each picture is uploaded as.
+2. `surface_record.py page --walk walk.json --after <after>/manifest.json --before <before>/manifest.json --out
    <scratchpad>/walkthrough-<date>.html`, and **publish** it with `capabilities: {db: {}, assets: {}}` (the
    `artifact-capabilities` skill holds the call shapes).
-2. **Upload the pictures** (`asset: true`, up to 25 per call), write `{file: url}` to `urls.json`, rebuild with
+3. **Upload the `.jpg` views** (`asset: true`, up to 25 per call), write `{view: url}` to `urls.json`, rebuild with
    `--assets urls.json`, and republish the same file.
-3. **Send Ben the link** in one line. Before and after sit side by side; *no visible change* is badged.
+4. **Send Ben the link** in one line. Before and after sit side by side, what changed is boxed on both as a layer
+   (the *Changes shown* switch hides it to show the true screen), and *no visible change* is badged.
 
 **Desk or phone.** Started from a remote device (the harness says Remote Control, or Ben says he is away), the
 artifact IS the walkthrough: he cannot reach the dev server. At a desk, also start a server on a seeded throwaway

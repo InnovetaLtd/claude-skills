@@ -65,6 +65,67 @@ class PageTests(unittest.TestCase):
         self.assertNotIn('</script><script>alert', html)
 
 
+class MarkTests(unittest.TestCase):
+    """The diff aligns rows like a text diff, so only what changed is boxed, never the page below it."""
+
+    def page(self, bands, width=200):
+        from PIL import Image, ImageDraw
+        img = Image.new('RGB', (width, sum(h for h, _ in bands)), 'white')
+        draw, y = ImageDraw.Draw(img), 0
+        for height, colour in bands:
+            if colour:
+                draw.rectangle((20, y + 2, 120, y + height - 3), fill=colour)
+            y += height
+        return img
+
+    def setUp(self):
+        try:
+            import PIL  # noqa: F401
+        except ImportError:
+            self.skipTest('Pillow is not installed')
+
+    def test_an_inserted_band_is_boxed_and_the_shifted_page_below_is_not(self):
+        before = self.page([(40, 'navy'), (40, 'teal'), (40, 'olive')])
+        after = self.page([(40, 'navy'), (30, 'red'), (40, 'teal'), (40, 'olive')])
+        on_after, on_before = surface_record.changed_boxes(after, before)
+        self.assertEqual(len(on_after), 1)
+        x0, y0, x1, y1 = on_after[0]
+        self.assertTrue(36 <= y0 <= 42 and 67 <= y1 < 72, on_after)   # the red block (42-67), not the teal shifted to 72
+        self.assertTrue(18 <= x0 <= 22 and 118 <= x1 <= 122, on_after)
+        self.assertEqual(on_before, [])
+
+    def test_a_change_in_place_is_boxed_on_both_and_a_removal_on_the_before(self):
+        before = self.page([(40, 'navy'), (40, 'teal'), (40, 'olive')])
+        changed = self.page([(40, 'navy'), (40, 'maroon'), (40, 'olive')])
+        on_after, on_before = surface_record.changed_boxes(changed, before)
+        self.assertEqual([b[1:4:2] for b in on_after], [b[1:4:2] for b in on_before])
+        removed = self.page([(40, 'navy'), (40, 'olive')])
+        on_after, on_before = surface_record.changed_boxes(removed, before)
+        self.assertEqual(on_after, [])
+        self.assertEqual(len(on_before), 1)
+
+    def test_mark_writes_clean_views_and_keeps_the_boxes_as_fractions(self):
+        import hashlib
+        base = Path(tempfile.mkdtemp())
+        for label, img in (('after', self.page([(40, 'navy'), (30, 'red'), (40, 'teal')])),
+                           ('before', self.page([(40, 'navy'), (40, 'teal')]))):
+            (base / label).mkdir()
+            name = f'{label}-w001-1.png'
+            img.save(base / label / name)
+            digest = hashlib.sha256((base / label / name).read_bytes()).hexdigest()
+            (base / label / 'manifest.json').write_text(json.dumps({'walks': [{'key': 'k', 'shots': [
+                {'file': name, 'caption': 'c', 'sha256': digest, 'stopped': False}]}]}))
+        surface_record.mark(base / 'after', base / 'before')
+        shot = json.loads((base / 'after' / 'manifest.json').read_text())['walks'][0]['shots'][0]
+        self.assertEqual(shot['view'], 'after-w001-1.jpg')
+        self.assertEqual(shot['changes'], 1)
+        x0, y0, x1, y1 = shot['boxes'][0]
+        self.assertTrue(0 < x0 < x1 <= 1 and 0.3 < y0 < y1 < 0.7, shot['boxes'])
+        from PIL import Image
+        view = Image.open(base / 'after' / 'after-w001-1.jpg').convert('RGB')
+        self.assertGreater(sum(view.getpixel((160, 55))), 740)   # inside the box's area, still white: nothing drawn in
+
+
 class ReportTests(unittest.TestCase):
     def test_the_leak_where_it_leaks_what_repeats_and_what_waits(self):
         app = Path(tempfile.mkdtemp())

@@ -11,6 +11,7 @@
   --ok: #1f7a4a; --ok-soft: #e1f2e8; --noted: #1d5c86; --noted-soft: #e2edf5;
   --fixed: #0f6f6a; --fixed-soft: #dcf1ef; --recheck: #8a5a00; --recheck-soft: #fbefd6;
   --bad: #a3262a; --bad-soft: #f8e1e1;
+  --mark: #d6006e; --mark-soft: rgba(214, 0, 110, .12); --mark-halo: #ffffff;
   --f-body: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
   --f-mono: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
 }
@@ -19,13 +20,15 @@
   --accent: #7db8e0; --accent-soft: #1d3142;
   --ok: #6fcf97; --ok-soft: #173326; --noted: #7db8e0; --noted-soft: #1d3142;
   --fixed: #5fd0c6; --fixed-soft: #143331; --recheck: #f0c264; --recheck-soft: #3a2e14;
-  --bad: #f08a8d; --bad-soft: #3d1c1e; color-scheme: dark } }
+  --bad: #f08a8d; --bad-soft: #3d1c1e;
+  --mark: #ff4fa3; --mark-soft: rgba(255, 79, 163, .16); --mark-halo: #11171d; color-scheme: dark } }
 :root[data-theme="dark"] {
   --bg: #11171d; --surface: #1a222b; --ink: #e4eaf0; --muted: #9aa8b5; --line: #2c3742;
   --accent: #7db8e0; --accent-soft: #1d3142;
   --ok: #6fcf97; --ok-soft: #173326; --noted: #7db8e0; --noted-soft: #1d3142;
   --fixed: #5fd0c6; --fixed-soft: #143331; --recheck: #f0c264; --recheck-soft: #3a2e14;
-  --bad: #f08a8d; --bad-soft: #3d1c1e; color-scheme: dark }
+  --bad: #f08a8d; --bad-soft: #3d1c1e;
+  --mark: #ff4fa3; --mark-soft: rgba(255, 79, 163, .16); --mark-halo: #11171d; color-scheme: dark }
 
 body { background: var(--bg); color: var(--ink); font: 16px/1.5 var(--f-body);
   padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
@@ -48,7 +51,7 @@ header.head { display: grid; gap: 8px; }
 @media (prefers-reduced-motion: reduce) { .progress > i { transition: none; } }
 
 nav.strip { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg);
-  padding-block: 8px; border-bottom: 1px solid var(--line); overflow-x: auto; }
+  padding-block: 8px; border-bottom: 1px solid var(--line); }
 nav.strip ol { list-style: none; margin: 0; padding: 0; display: flex; gap: 6px; }
 nav.strip a { display: grid; place-items: center; min-width: 40px; height: 40px; border-radius: 8px;
   font: 700 .9rem var(--f-mono); text-decoration: none; color: var(--ink); background: var(--surface);
@@ -91,6 +94,17 @@ ol.steps figcaption::before { content: counter(step) ". "; font: 700 .85rem var(
 .pic { display: grid; gap: 4px; min-width: 0; }
 .pic-label { font-size: .75rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
 .chip.same { border-color: var(--ok); color: var(--ok); justify-self: start; }
+.chip.changes { border-color: var(--mark); color: var(--mark); justify-self: start; }
+.frame { position: relative; display: block; line-height: 0; }
+.mark { position: absolute; border: 2px solid var(--mark); background: var(--mark-soft); border-radius: 3px;
+  box-shadow: 0 0 0 1px var(--mark-halo); pointer-events: none; }
+:root.marks-off .mark { display: none; }
+.strip-row { display: flex; gap: 10px; align-items: center; }
+.strip-row ol { flex: 1 1 auto; min-width: 0; overflow-x: auto; }
+button.marks { flex: 0 0 auto; min-height: 40px; padding: 0 12px; border-radius: 8px; font: 700 .85rem var(--f-body);
+  border: 1px solid var(--mark); background: var(--mark-soft); color: var(--ink); cursor: pointer; }
+button.marks[aria-pressed="false"] { border-color: var(--line); background: var(--surface); color: var(--muted); }
+button.marks:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 details.found { border-top: 1px solid var(--line); padding-top: 8px; }
 details.found summary { cursor: pointer; font-weight: 700; font-size: .92rem; }
 details.found ul { margin: 8px 0 0; padding-left: 20px; display: grid; gap: 6px; }
@@ -116,7 +130,8 @@ section.summary { background: var(--surface); border: 1px solid var(--line); bor
     <div class="progress" aria-hidden="true"><i id="bar"></i></div>
     <p class="status-line" id="live" role="status" aria-live="polite">Your notes appear on each check as you give them.</p>
   </header>
-  <nav class="strip" aria-label="Checks"><ol id="strip"></ol></nav>
+  <nav class="strip" aria-label="Checks"><div class="strip-row"><ol id="strip"></ol>
+    <button type="button" class="marks" id="marks" aria-pressed="true" hidden>Changes shown</button></div></nav>
   <section class="zero" id="zero" hidden><h2>Finding #0: failed the phone or dark-mode sweep</h2><ul id="zero-list"></ul></section>
   <section class="summary" id="summary" hidden></section>
   <div id="checks" style="display:grid;gap:16px"></div>
@@ -195,25 +210,32 @@ section.summary { background: var(--surface); border: 1px solid var(--line); bor
       shots.forEach(function (s) {
         var li = el("li", s.stopped ? { "class": "stopped" } : null);
         var fig = el("figure");
-        function picture(url, label) {
+        function picture(url, label, boxes) {
           var box = el("div", { "class": "pic" });
           if (label) box.appendChild(el("span", { "class": "pic-label" }, label));
-          var a = el("a", { href: url, target: "_blank", rel: "noopener" });
+          var a = el("a", { href: url, target: "_blank", rel: "noopener", "class": "frame" });
           a.appendChild(el("img", { src: url, alt: (label ? label + ": " : "") + s.caption, loading: "lazy" }));
+          (boxes || []).forEach(function (b) {
+            var m = el("span", { "class": "mark", "aria-hidden": "true" });
+            m.style.left = (b[0] * 100) + "%"; m.style.top = (b[1] * 100) + "%";
+            m.style.width = ((b[2] - b[0]) * 100) + "%"; m.style.height = ((b[3] - b[1]) * 100) + "%";
+            a.appendChild(m);
+          });
           box.appendChild(a);
           return box;
         }
         if (s.url && s.before_url) {
           var pair = el("div", { "class": "pair" });
-          pair.appendChild(picture(s.before_url, "Before"));
-          pair.appendChild(picture(s.url, "After"));
+          pair.appendChild(picture(s.before_url, "Before", s.before_boxes));
+          pair.appendChild(picture(s.url, "After", s.boxes));
           fig.appendChild(pair);
         } else if (s.url) {
-          fig.appendChild(picture(s.url, null));
+          fig.appendChild(picture(s.url, null, s.boxes));
         } else if (!s.stopped) {
           fig.appendChild(el("p", { "class": "muted" }, "Picture uploading…"));
         }
         if (s.same) fig.appendChild(el("span", { "class": "chip same" }, "no visible change"));
+        if (s.changes) fig.appendChild(el("span", { "class": "chip changes" }, s.changes + (s.changes === 1 ? " change" : " changes") + " marked"));
         if (s["new"]) fig.appendChild(el("span", { "class": "chip shape" }, "new"));
         fig.appendChild(el("figcaption", null, s.caption));
         li.appendChild(fig); ol.appendChild(li);
@@ -272,6 +294,23 @@ section.summary { background: var(--surface); border: 1px solid var(--line); bor
 
   function renderAll() { renderHead(); renderStrip(); renderSummary(); renderChecks(); }
   renderAll();
+
+  // The change marks are a layer over the true screen: one switch hides them everywhere.
+  var marksBtn = document.getElementById("marks");
+  var anyMarks = data.checks.some(function (c) { return (c.shots || []).some(function (s) { return (s.boxes || []).length || (s.before_boxes || []).length; }); });
+  function setMarks(on) {
+    document.documentElement.classList.toggle("marks-off", !on);
+    marksBtn.setAttribute("aria-pressed", on ? "true" : "false");
+    marksBtn.textContent = on ? "Changes shown" : "Changes hidden";
+    try { localStorage.setItem("walk-marks", on ? "on" : "off"); } catch (e) {}
+  }
+  if (anyMarks) {
+    marksBtn.hidden = false;
+    var saved = null;
+    try { saved = localStorage.getItem("walk-marks"); } catch (e) {}
+    setMarks(saved !== "off");
+    marksBtn.addEventListener("click", function () { setMarks(marksBtn.getAttribute("aria-pressed") !== "true"); });
+  }
 
   // Live notes: Claude writes checks/c<n> and meta/summary as Ben talks; the page only reads.
   if (!window.claude || !window.claude.use) return;
