@@ -40,3 +40,9 @@ tap_selector = ".btn, button, input[type=submit], input[type=button]"
 # code = ["**/*.py"]          # app code: a template, script or CSS token it names may be on any page
 # code_exclude = ["**/test_*.py", "**/*_test.py", "**/tests.py", "**/tests/**", "**/migrations/**"]
 # css_var_fanout_max = 12     # a custom property read by more rules than this lints every screen
+
+[record]
+# surface_record.py: floating chrome pinned to the window (a scan button, a quick-action bubble) lands
+# somewhere arbitrary in a full-page picture and reads as a change between two runs. Name it here and it
+# is hidden while recording. Not hidden generically: a flow may mean to show a dialog.
+hide = []

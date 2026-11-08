@@ -22,6 +22,10 @@ optional `shot` caption, `full_page` and `selector` on any step):
     {goto = "/path/"}  {click = "a:has-text('Open the draft')"}  {fill = ["#id_qty", "4"]}
     {select = ["#id_term", "30 days"]}  {press = ["#id_qty", "Enter"]}  {wait = 500}  {shot = "caption"}
 
+Floating chrome pinned to the window (a scan button, a quick-action bubble) lands somewhere arbitrary in a
+full-page picture, so the app names it in `surface-review.toml` (`[record] hide = [".fab"]`) and it is hidden
+while recording; it is not hidden generically, since a flow may mean to show a dialog.
+
 Flows on one screen run in registry order on ONE seeded world: a flow that saves something should
 have a setup of its own. `--plan` adds one-off walks in the same shape plus `screen` (a walkthrough's
 checks on screens with no flow yet); `--stills` adds a desk and a phone picture of each selected
@@ -54,6 +58,10 @@ import surface_lint as lint
 from check_surface_reviews import STEP_VERBS
 
 HERE = Path(__file__).resolve().parent
+#: Text drawn the same way every run: grayscale, unhinted, no LCD colour fringes. Without these two runs
+#: of the SAME page differ by up to ~32 grey levels on unchanged text (measured 2026-11-08), which the
+#: before/after diff then reads as change.
+RENDER_ARGS = ['--disable-lcd-text', '--font-render-hinting=none', '--disable-gpu']
 TEMPLATE = HERE.parent / 'templates' / 'walkthrough-checklist.html'
 
 
@@ -107,7 +115,7 @@ def record_walks(walks, urls, base, cfg, channel, out, theme, label=''):
     manifest = []
     theme_init = cfg['lint'].get('theme_init')
     with sync_playwright() as pw:
-        browser = pw.chromium.launch(channel=channel) if channel != 'chromium' else pw.chromium.launch()
+        browser = pw.chromium.launch(args=RENDER_ARGS, **({} if channel == 'chromium' else {'channel': channel}))
         for i, walk in enumerate(walks, 1):
             phone = walk['viewport'] == 'phone'
             width, height = lint.WIDTHS[walk['viewport']]
@@ -115,6 +123,12 @@ def record_walks(walks, urls, base, cfg, channel, out, theme, label=''):
                                           device_scale_factor=2 if phone else 1, **lint.DEVICE[walk['viewport']])
             if theme_init:
                 context.add_init_script(lint.fill(theme_init, theme=theme))
+            hide = cfg.get('record', {}).get('hide', [])
+            if hide:
+                css = ', '.join(hide) + ' { visibility: hidden !important; }'
+                context.add_init_script(
+                    "document.addEventListener('DOMContentLoaded', function () { var s = document.createElement('style');"
+                    " s.textContent = " + json.dumps(css) + "; document.head.appendChild(s); });")
             page = context.new_page()
             page.set_default_timeout(walk.get('timeout_ms') or 10000)
             shots = []
@@ -144,7 +158,8 @@ def record_walks(walks, urls, base, cfg, channel, out, theme, label=''):
                 shoot(f'Stopped opening the {walk["setup"]} setup: {str(exc).splitlines()[0][:200]}', {},
                       stopped=True)
             manifest.append({k: walk.get(k) for k in ('key', 'screen', 'name', 'scenario', 'sees',
-                                                        'viewport', 'setup', 'steps')} | {'shots': shots})
+                                                        'viewport', 'setup', 'steps')}
+                            | {'scale': 2 if phone else 1, 'shots': shots})
             context.close()
         browser.close()
     return manifest
@@ -227,115 +242,273 @@ def record(opts):
 # ---------------------------------------------------------------------------------------------
 #
 # A plain pixel diff lights up everything below an insertion (the page shifts down). So the rows are
-# aligned first, the way a text diff aligns lines (difflib, on each row's colours coarsened so the
-# browser's text-smoothing noise does not split a row; colour, not grey, so a red band and a teal band of
-# the same lightness never pass for each other, which is also why the recorder keeps PNG: a
-# JPEG re-encodes a shifted block differently). A band only the after has was ADDED, a band only the
-# before has was REMOVED, and a band on both is compared row against row, counting only a pixel that
-# moved by more than NOISE (two runs of the same page differ by up to ~32 grey levels: measured on
-# Build Manager's acknowledgement, 2026-11-08). Specks under MIN_AREA go; nearby boxes merge.
-# The boxes are kept as COORDINATES, never drawn into the picture: the page lays them over it as a
-# layer Ben can switch off to see the true screen (Ben, 2026-11-08).
+# aligned first, the way a text diff aligns lines (difflib on each row's exact pixels: the recorder
+# keeps PNG and draws text the same way every run, RENDER_ARGS, so an unchanged row is byte-identical).
+# A band only the after has was ADDED and a band only the before has was REMOVED. A band both have is
+# paired at the vertical offset that differs least, and a pixel counts only when it moved by more than
+# NOISE AND is content on that side (not page background): a box never marks empty space, and never
+# sits a line off the text it means. Specks under MIN_AREA go; nearby boxes merge. The boxes are kept
+# as COORDINATES, never drawn into the picture: the page lays them over it as a layer Ben can switch
+# off to see the true screen (Ben, 2026-11-08). Checked by eye against Build Manager's order and
+# acknowledgement pages before and after their surface reviews, 2026-11-08.
 
-NOISE = 64                    # grey levels: a pixel that moved less than this is rendering noise
-KEY_SHIFT = 5                 # alignment key: each colour channel >> 5 (8 levels)
+NOISE = 48                    # grey levels: smaller moves are anti-aliasing, not change
 MIN_AREA = 24                 # px: a box smaller than this is a speck, not a change
-MERGE_GAP = 12                # px: boxes this close are one change
+MERGE_GAP = 12                # px: boxes this close (and overlapping side to side) are one change
+SPLIT_GAP = 24                # px: content this far apart across a row is two changes, not one
+MAX_SHIFT = 600               # px: the furthest a band's rows are searched for their partner
+NUDGE = 2                     # px: a box that matches its partner moved by this much is a re-drawn edge
+NUDGE_LEFT = 0.02             # share of a box's pixels that may still differ after the nudge
+MOVE = 240                    # px: content found this far sideways, unchanged, MOVED (a dropped column
+                              # moves the rest a long way: BM's acknowledgement totals moved 194 px)
+MOVE_Y = 32                   # px: ...and this far up or down (a header above it now wraps one line less)
+SOFTEN = 0.6                  # blur radius for those two checks: text that lands on a fraction of a pixel
+                              # is re-drawn (BM's right-aligned quantity: 21 of 108 pixels differ, 0 once
+                              # softened), while a 2 against a 1 still differs by 38 pixels
+SMALL_PATCH = 2000            # px: a patch this small is searched on half-size copies (a quarter-size digit is mush)
+CANDIDATES = 20               # best coarse spots confirmed at full size
+# Every distance above is in CSS pixels. A phone picture is recorded at 2 device pixels per CSS pixel, so
+# `changed_boxes` is told the picture's scale and _px() converts (areas by its square).
+_SCALE = [1]
+
+
+def _px(n, area=False):
+    return int(n * _SCALE[0] * (_SCALE[0] if area else 1))
 
 
 def _rows(img):
-    """The picture's rows as grey bytes."""
-    grey = img.convert('L')
-    raw, w = grey.tobytes(), grey.width
-    return [raw[y * w:(y + 1) * w] for y in range(grey.height)]
-
-
-def _keys(img):
-    """Each row's alignment key: its colours, coarsened."""
+    """The picture's rows as exact RGB bytes (the alignment key)."""
     rgb = img.convert('RGB')
     raw, w = rgb.tobytes(), rgb.width * 3
-    return [bytes(v >> KEY_SHIFT for v in raw[y * w:(y + 1) * w]) for y in range(rgb.height)]
+    return [raw[y * w:(y + 1) * w] for y in range(rgb.height)]
 
 
-def _differs(row, other):
-    """(first, last) column where the rows differ by more than NOISE; against no other row, where
-    the row differs from its own leftmost pixel (the content of an added or removed band)."""
-    if other is None:
-        bg = row[0]
-        cols = [x for x in range(len(row)) if abs(row[x] - bg) > NOISE]
-    else:
-        cols = [x for x in range(min(len(row), len(other))) if abs(row[x] - other[x]) > NOISE]
-    return (cols[0], cols[-1]) if cols else None
+def _over(img):
+    """Pixels above NOISE, as a 0/255 mask."""
+    return img.point(lambda v: 255 if v > NOISE else 0)
 
 
-def _boxes(rows, y0, others=None):
-    """Boxes over the rows that differ, one per run of differing rows."""
-    boxes, run = [], None
-    for n, row in enumerate(rows):
-        hit = _differs(row, others[n] if others is not None else None)
-        if hit:
-            run = [min(run[0], hit[0]), run[1], max(run[2], hit[1]), y0 + n] if run else [hit[0], y0 + n, hit[1], y0 + n]
-        elif run:
-            boxes.append(tuple(run))
-            run = None
-    if run:
-        boxes.append(tuple(run))
+def _delta(a, b):
+    """How far each pixel moved: the largest change in any colour channel (grey alone would let a red
+    chip turn teal unseen: they are the same lightness)."""
+    from PIL import ImageChops
+    r, g, b_ = ImageChops.difference(a, b).split()
+    return ImageChops.lighter(ImageChops.lighter(r, g), b_)
+
+
+def _ink(rgb):
+    """Content on this picture: pixels that differ from their own row's background (its leftmost
+    pixel, stretched across the row)."""
+    edge = rgb.crop((0, 0, 1, rgb.height)).resize(rgb.size)
+    return _over(_delta(rgb, edge))
+
+
+def _runs(mask, y0):
+    """Boxes (x0, y0, x1, y1) round the set pixels: one per run of rows, split where the run's content
+    has a gap of SPLIT_GAP across it (new text and an untouched icon beside it stay two boxes)."""
+    from PIL import Image
+    raw, w = mask.tobytes(), mask.width
+    spans, start = [], None
+    for n in range(mask.height + 1):
+        hit = n < mask.height and raw[n * w:(n + 1) * w].find(b'\xff') >= 0
+        if hit and start is None:
+            start = n
+        elif not hit and start is not None:
+            spans.append((start, n))
+            start = None
+    boxes = []
+    for top, bottom in spans:
+        band = mask.crop((0, top, w, bottom))
+        cols = band.resize((w, 1), Image.BOX).tobytes()
+        x = 0
+        while x < w:
+            if not cols[x]:
+                x += 1
+                continue
+            left, gap = x, 0
+            while x < w and gap < _px(SPLIT_GAP):
+                gap = 0 if cols[x] else gap + 1
+                x += 1
+            box = band.crop((left, 0, x - gap, band.height)).getbbox()
+            if box:
+                boxes.append((left + box[0], y0 + top + box[1], left + box[2] - 1, y0 + top + box[3] - 1))
     return boxes
 
 
-def _paired(rows_a, ja, rows_b, ib):
-    """A band both pictures have: pair its rows top-aligned or bottom-aligned, whichever differs less,
-    and treat the rows left over on the longer side as added or removed."""
-    h = min(len(rows_a), len(rows_b))
+def _paired(ga, ja, la, gb, ib, lb):
+    """A band both pictures have (after rows ja..ja+la, before rows ib..ib+lb): pair the shorter band
+    with the stretch of the longer that differs least, box what differs on each side, and treat the
+    longer side's leftover rows as added or removed."""
+    from PIL import ImageChops
+    a = ga.crop((0, ja, ga.width, ja + la))
+    b = gb.crop((0, ib, gb.width, ib + lb))
+    h = min(la, lb)
     best = None
-    for da, db in {(0, 0), (len(rows_a) - h, len(rows_b) - h)}:
-        on_a = _boxes(rows_a[da:da + h], ja + da, rows_b[db:db + h])
-        on_b = _boxes(rows_b[db:db + h], ib + db, rows_a[da:da + h])
-        area = sum((b[2] - b[0] + 1) * (b[3] - b[1] + 1) for b in on_a)
-        if best is None or area < best[0]:
-            extra_a = _boxes(rows_a[:da], ja) + _boxes(rows_a[da + h:], ja + da + h)
-            extra_b = _boxes(rows_b[:db], ib) + _boxes(rows_b[db + h:], ib + db + h)
-            best = (area, on_a + extra_a, on_b + extra_b)
-    return best[1], best[2]
+    for off in range(0, min(abs(la - lb), MAX_SHIFT) + 1):
+        da, db = (off, 0) if la > lb else (0, off)
+        diff = _over(_delta(a.crop((0, da, a.width, da + h)), b.crop((0, db, b.width, db + h))))
+        cost = diff.histogram()[255]
+        if best is None or cost < best[0]:
+            best = (cost, da, db, diff)
+    _, da, db, diff = best
+    pa, pb = a.crop((0, da, a.width, da + h)), b.crop((0, db, b.width, db + h))
+    shift = (ib + db) - (ja + da)          # after row y is before row y + shift, in this band
+    on_a = _kinds(_runs(ImageChops.multiply(diff, _ink(pa)), ja + da), ga, gb, {shift})
+    on_b = _kinds(_runs(ImageChops.multiply(diff, _ink(pb)), ib + db), gb, ga, {-shift})
+    for top, rest, base, side in ((a.crop((0, 0, a.width, da)), a.crop((0, da + h, a.width, la)), ja, on_a),
+                                  (b.crop((0, 0, b.width, db)), b.crop((0, db + h, b.width, lb)), ib, on_b)):
+        if top.height:
+            side += [box + ('changed',) for box in _runs(_ink(top), base)]
+        if rest.height:
+            side += [box + ('changed',) for box in _runs(_ink(rest), base + (da if side is on_a else db) + h)]
+    return on_a, on_b
+
+
+def _found(patch, other, x0, y0, xs, allowed):
+    """True when the patch appears in the other picture at row y0 (give or take NUDGE) and any of
+    the column offsets `xs`."""
+    for ny in range(-_px(NUDGE), _px(NUDGE) + 1):
+        for nx in xs:
+            ox, oy = x0 + nx, y0 + ny
+            if ox < 0 or oy < 0 or ox + patch.width > other.width or oy + patch.height > other.height:
+                continue
+            twin = other.crop((ox, oy, ox + patch.width, oy + patch.height))
+            if _over(_delta(patch, twin)).histogram()[255] <= allowed:
+                return True
+    return False
+
+
+def _kind(box, side, other, dys):
+    """What a differing patch IS. `same`: it matches the other picture nudged up to NUDGE px (a vector
+    icon or a border landing on a fractional pixel is re-drawn, not changed: BM's dropdown arrow,
+    2026-11-08). `moved`: it is there unchanged, slid up to MOVE px sideways (a resized column: BM's
+    order-form quantities, 2026-11-08). Otherwise `changed`. `dys` map this picture's rows onto the
+    other's."""
+    x0, y0, x1, y1 = box
+    # Cut from the softened WHOLE picture: softening a tight cut-out smears its edges against nothing,
+    # and the box hugs the text, so those edges would never match (BM's moved £45.00, 2026-11-08).
+    patch = _softened(side).crop((x0, y0, x1 + 1, y1 + 1))
+    other = _softened(other)
+    allowed = max(4, int(patch.width * patch.height * NUDGE_LEFT))
+    if any(_found(patch, other, x0, y0 + dy, range(-_px(NUDGE), _px(NUDGE) + 1), allowed) for dy in dys):
+        return 'same'
+    return 'moved' if any(_moved(patch, other, x0, y0 + dy, allowed) for dy in dys) else 'changed'
+
+
+# One derived copy per picture, cached against the picture ITSELF: an id() key is reused once a picture
+# is freed, and handed the next picture a stale copy (a flaky test found it, 2026-11-08).
+_CACHE = {'soft': [], 'small2': [], 'small4': []}
+
+
+def _derived(kind, img, make):
+    """The `kind` copy of a picture; the last two are kept (the diff alternates after and before)."""
+    held = _CACHE[kind]
+    for picture, copy in held:
+        if picture is img:
+            return copy
+    copy = make(img)
+    held[:] = (held + [(img, copy)])[-2:]
+    return copy
+
+
+def _soft(img):
+    """Softened by SOFTEN CSS pixels (so twice as much on a phone picture: at 0.6 device px a moved word
+    on BM's phone acknowledgement still differed in 192 pixels; at 1.2, none)."""
+    from PIL import ImageFilter
+    return img.filter(ImageFilter.GaussianBlur(SOFTEN * _SCALE[0]))
+
+
+def _softened(img):
+    """The softened copy of a whole picture, made once per picture."""
+    return _derived('soft', img, _soft)
+
+
+def _moved(patch, other, x0, y0, allowed):
+    """True when the patch is in the other picture unchanged within MOVE px sideways and MOVE_Y px up
+    or down. Searched coarse to fine: on reduced copies first (half size for a small patch, a quarter
+    for a large one), then the CANDIDATES best spots are confirmed at full size (a small digit's single
+    best coarse spot can be a near-blank one)."""
+    scale = 2 if patch.width * patch.height <= _px(SMALL_PATCH, area=True) else 4
+    small = _derived(f'small{scale}', other, lambda img: img.reduce(scale))
+    # Both sides are softened (`_kind`), so a move by an odd number of pixels still ranks near the top
+    # on the reduced copies; each candidate is then confirmed within +/- scale px at full size.
+    tiny, found = patch.reduce(scale), []
+    for sy in range((y0 - _px(MOVE_Y)) // scale, (y0 + _px(MOVE_Y)) // scale + 1):
+        for sx in range((x0 - _px(MOVE)) // scale, (x0 + _px(MOVE)) // scale + 1):
+            if sx < 0 or sy < 0 or sx + tiny.width > small.width or sy + tiny.height > small.height:
+                continue
+            crop = small.crop((sx, sy, sx + tiny.width, sy + tiny.height))
+            found.append((_over(_delta(tiny, crop)).histogram()[255], sx * scale, sy * scale))
+    # The best spots, spread out: twenty neighbours of one near-miss would crowd out the real one.
+    chosen = []
+    for _, ox, oy in sorted(found):
+        if any(abs(ox - cx) <= 2 * scale and abs(oy - cy) <= 2 * scale for cx, cy in chosen):
+            continue
+        chosen.append((ox, oy))
+        if _found(patch, other, ox, oy, range(-scale, scale + 1), allowed):
+            return True
+        if len(chosen) == CANDIDATES:
+            break
+    return False
+
+
+def _kinds(boxes, side, other, dys):
+    """The boxes that are not `same`, each with its kind appended."""
+    out = []
+    for box in boxes:
+        kind = _kind(box, side, other, dys)
+        if kind != 'same':
+            out.append(box + (kind,))
+    return out
 
 
 def _merge(boxes):
+    """Nearby boxes of the same kind become one; specks go."""
     merged = []
-    for box in sorted((b for b in boxes if (b[2] - b[0] + 1) * (b[3] - b[1] + 1) >= MIN_AREA), key=lambda b: b[1]):
-        if merged and box[1] - merged[-1][3] <= MERGE_GAP:
-            last = merged[-1]
-            merged[-1] = (min(last[0], box[0]), last[1], max(last[2], box[2]), max(last[3], box[3]))
+    for box in sorted((b for b in boxes if (b[2] - b[0] + 1) * (b[3] - b[1] + 1) >= _px(MIN_AREA, area=True)), key=lambda b: b[1]):
+        near = [k for k, m in enumerate(merged) if m[4] == box[4] and box[1] - m[3] <= _px(MERGE_GAP)
+                and box[0] <= m[2] + _px(SPLIT_GAP) and m[0] <= box[2] + _px(SPLIT_GAP)]
+        if near:
+            m = merged[near[-1]]
+            merged[near[-1]] = (min(m[0], box[0]), min(m[1], box[1]), max(m[2], box[2]), max(m[3], box[3]), m[4])
         else:
             merged.append(box)
     return merged
 
 
-def changed_boxes(after_img, before_img):
-    """([boxes on the after], [boxes on the before]), each box (x0, y0, x1, y1) in pixels."""
+def changed_boxes(after_img, before_img, scale=1):
+    """([boxes on the after], [boxes on the before]), each box (x0, y0, x1, y1, kind) in pixels, kind
+    `changed` or `moved`."""
     import difflib
+    _SCALE[0] = scale
     if after_img.width != before_img.width:
-        return ([(0, 0, after_img.width - 1, after_img.height - 1)],
-                [(0, 0, before_img.width - 1, before_img.height - 1)])
-    rows_a, rows_b = _rows(after_img), _rows(before_img)
-    keys_a, keys_b = _keys(after_img), _keys(before_img)
+        return ([(0, 0, after_img.width - 1, after_img.height - 1, 'changed')],
+                [(0, 0, before_img.width - 1, before_img.height - 1, 'changed')])
+    ga, gb = after_img.convert('RGB'), before_img.convert('RGB')
     on_after, on_before = [], []
-    for op, i1, i2, j1, j2 in difflib.SequenceMatcher(None, keys_b, keys_a, autojunk=False).get_opcodes():
+    ops = difflib.SequenceMatcher(None, _rows(before_img), _rows(after_img), autojunk=False).get_opcodes()
+    for n, (op, i1, i2, j1, j2) in enumerate(ops):
+        # Where an added or removed band would sit in the other picture: the offset of the matched rows
+        # just above it, or just below it (a lone blank row can match out of place, so try both).
+        near = {o[1] - o[3] for o in (ops[n - 1] if n else None, ops[n + 1] if n + 1 < len(ops) else None)
+                if o and o[0] == 'equal'} or {i1 - j1}
         if op == 'replace':
-            a, b = _paired(rows_a[j1:j2], j1, rows_b[i1:i2], i1)
+            a, b = _paired(ga, j1, j2 - j1, gb, i1, i2 - i1)
             on_after += a
             on_before += b
         elif op == 'insert':
-            on_after += _boxes(rows_a[j1:j2], j1)
+            on_after += _kinds(_runs(_ink(ga.crop((0, j1, ga.width, j2))), j1), ga, gb, near)
         elif op == 'delete':
-            on_before += _boxes(rows_b[i1:i2], i1)
+            on_before += _kinds(_runs(_ink(gb.crop((0, i1, gb.width, i2))), i1), gb, ga, {-d for d in near})
     return _merge(on_after), _merge(on_before)
 
 
 def _as_share(boxes, img):
-    """Boxes as fractions of the picture, so the page can lay them over it at any width."""
+    """Boxes as fractions of the picture, so the page can lay them over it at any width; a moved box
+    carries a fifth element, "moved"."""
     w, h = img.width, img.height
     return [[round(x0 / w, 5), round(y0 / h, 5), round((x1 + 1) / w, 5), round((y1 + 1) / h, 5)]
-            for x0, y0, x1, y1 in boxes]
+            + (['moved'] if kind == 'moved' else []) for x0, y0, x1, y1, kind in boxes]
 
 
 def mark(after_dir, before_dir=None):
@@ -361,9 +534,10 @@ def mark(after_dir, before_dir=None):
             old = then[n] if n < len(then) else None
             if old and 'file' in shot and 'file' in old and old['sha256'] != shot['sha256']:
                 new_img, old_img = Image.open(after_dir / shot['file']), Image.open(before_dir / old['file'])
-                on_after, on_before = changed_boxes(new_img, old_img)
+                on_after, on_before = changed_boxes(new_img, old_img, walk.get('scale') or 1)
                 shot['boxes'], old['boxes'] = _as_share(on_after, new_img), _as_share(on_before, old_img)
-                shot['changes'] = max(len(on_after), len(on_before))
+                shot['changes'] = max(sum(b[4] == 'changed' for b in on_after), sum(b[4] == 'changed' for b in on_before))
+                shot['moved'] = max(sum(b[4] == 'moved' for b in on_after), sum(b[4] == 'moved' for b in on_before))
                 marked += 1
             view(after_dir, shot)
             if old:

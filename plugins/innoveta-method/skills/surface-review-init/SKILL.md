@@ -12,7 +12,8 @@ The method is `standards/surface-review.md` (§4 is what this sets up). The scri
    current innoveta-method master commit), the registry / records / lists paths, `page_templates` + `page_marker`
    (what makes a template a PAGE rather than an include in this framework), `shared` globs, and `[lint]`: how to
    prepare a fresh scratch database, seed a setup, serve the app on `{port}`, the env that signs a dev user in,
-   the theme switch, and the button / tap selectors of its component catalogue. Read the app's own dev docs for
+   the theme switch, and the button / tap selectors of its component catalogue; and `[record] hide`, the
+   app's floating chrome (scan buttons, quick-action bubbles) the recorder hides from its pictures. Read the app's own dev docs for
    these: never guess a command into a gate.
 2. **Write the registry** (`templates/screens.toml`) and register the screens the current work touches, with
    their goal lines from the user's words, and a `[[screen.flow]]` for each scenario the work makes true.

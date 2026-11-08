@@ -89,7 +89,8 @@ class MarkTests(unittest.TestCase):
         after = self.page([(40, 'navy'), (30, 'red'), (40, 'teal'), (40, 'olive')])
         on_after, on_before = surface_record.changed_boxes(after, before)
         self.assertEqual(len(on_after), 1)
-        x0, y0, x1, y1 = on_after[0]
+        x0, y0, x1, y1, kind = on_after[0]
+        self.assertEqual(kind, 'changed')
         self.assertTrue(36 <= y0 <= 42 and 67 <= y1 < 72, on_after)   # the red block (42-67), not the teal shifted to 72
         self.assertTrue(18 <= x0 <= 22 and 118 <= x1 <= 122, on_after)
         self.assertEqual(on_before, [])
@@ -103,6 +104,31 @@ class MarkTests(unittest.TestCase):
         on_after, on_before = surface_record.changed_boxes(removed, before)
         self.assertEqual(on_after, [])
         self.assertEqual(len(on_before), 1)
+
+    def test_an_icon_moved_a_pixel_is_not_a_change_but_new_text_beside_it_is(self):
+        from PIL import ImageDraw
+        before = self.page([(40, 'navy'), (40, None), (40, 'olive')])
+        after = self.page([(40, 'navy'), (40, None), (40, 'olive')])
+        ImageDraw.Draw(before).ellipse((150, 50, 160, 60), fill='black')       # the icon...
+        ImageDraw.Draw(after).ellipse((151, 51, 161, 61), fill='black')        # ...re-drawn a pixel off
+        self.assertEqual(surface_record.changed_boxes(after, before), ([], []))
+        ImageDraw.Draw(after).rectangle((20, 45, 60, 70), fill='red')         # and something really new
+        on_after, on_before = surface_record.changed_boxes(after, before)
+        self.assertEqual(len(on_after), 1)
+        self.assertLess(on_after[0][2], 100)          # the box is the new block, not the icon
+        self.assertEqual(on_before, [])               # where the before has nothing, nothing is boxed
+
+    def test_a_column_slid_sideways_is_moved_not_changed(self):
+        from PIL import ImageDraw
+        before = self.page([(40, 'navy'), (40, None), (40, 'olive')], width=300)
+        after = self.page([(40, 'navy'), (40, None), (40, 'olive')], width=300)
+        ImageDraw.Draw(before).rectangle((150, 50, 170, 70), fill='black')
+        ImageDraw.Draw(before).ellipse((154, 54, 166, 66), fill='white')       # a value in its column...
+        ImageDraw.Draw(after).rectangle((190, 50, 210, 70), fill='black')
+        ImageDraw.Draw(after).ellipse((194, 54, 206, 66), fill='white')        # ...the column now 40px right
+        on_after, on_before = surface_record.changed_boxes(after, before)
+        self.assertEqual([b[4] for b in on_after], ['moved'])
+        self.assertEqual([b[4] for b in on_before], ['moved'])
 
     def test_mark_writes_clean_views_and_keeps_the_boxes_as_fractions(self):
         import hashlib
@@ -119,7 +145,7 @@ class MarkTests(unittest.TestCase):
         shot = json.loads((base / 'after' / 'manifest.json').read_text())['walks'][0]['shots'][0]
         self.assertEqual(shot['view'], 'after-w001-1.jpg')
         self.assertEqual(shot['changes'], 1)
-        x0, y0, x1, y1 = shot['boxes'][0]
+        x0, y0, x1, y1 = shot['boxes'][0][:4]
         self.assertTrue(0 < x0 < x1 <= 1 and 0.3 < y0 < y1 < 0.7, shot['boxes'])
         from PIL import Image
         view = Image.open(base / 'after' / 'after-w001-1.jpg').convert('RGB')

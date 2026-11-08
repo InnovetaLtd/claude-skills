@@ -11,7 +11,7 @@
   --ok: #1f7a4a; --ok-soft: #e1f2e8; --noted: #1d5c86; --noted-soft: #e2edf5;
   --fixed: #0f6f6a; --fixed-soft: #dcf1ef; --recheck: #8a5a00; --recheck-soft: #fbefd6;
   --bad: #a3262a; --bad-soft: #f8e1e1;
-  --mark: #d6006e; --mark-soft: rgba(214, 0, 110, .12); --mark-halo: #ffffff;
+  --mark: #d6006e; --mark-soft: rgba(214, 0, 110, .12);
   --f-body: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
   --f-mono: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
 }
@@ -21,15 +21,16 @@
   --ok: #6fcf97; --ok-soft: #173326; --noted: #7db8e0; --noted-soft: #1d3142;
   --fixed: #5fd0c6; --fixed-soft: #143331; --recheck: #f0c264; --recheck-soft: #3a2e14;
   --bad: #f08a8d; --bad-soft: #3d1c1e;
-  --mark: #ff4fa3; --mark-soft: rgba(255, 79, 163, .16); --mark-halo: #11171d; color-scheme: dark } }
+  --mark: #ff4fa3; --mark-soft: rgba(255, 79, 163, .16); color-scheme: dark } }
 :root[data-theme="dark"] {
   --bg: #11171d; --surface: #1a222b; --ink: #e4eaf0; --muted: #9aa8b5; --line: #2c3742;
   --accent: #7db8e0; --accent-soft: #1d3142;
   --ok: #6fcf97; --ok-soft: #173326; --noted: #7db8e0; --noted-soft: #1d3142;
   --fixed: #5fd0c6; --fixed-soft: #143331; --recheck: #f0c264; --recheck-soft: #3a2e14;
   --bad: #f08a8d; --bad-soft: #3d1c1e;
-  --mark: #ff4fa3; --mark-soft: rgba(255, 79, 163, .16); --mark-halo: #11171d; color-scheme: dark }
+  --mark: #ff4fa3; --mark-soft: rgba(255, 79, 163, .16); color-scheme: dark }
 
+[hidden] { display: none !important; }
 body { background: var(--bg); color: var(--ink); font: 16px/1.5 var(--f-body);
   padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
 body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
@@ -85,7 +86,7 @@ article.check { background: var(--surface); border: 1px solid var(--line); borde
 ol.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; grid-template-columns: 1fr; counter-reset: step; }
 @media (min-width: 760px) { ol.steps.many { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 ol.steps li { display: grid; gap: 6px; min-width: 0; counter-increment: step; }
-ol.steps figure { margin: 0; display: grid; gap: 6px; }
+ol.steps figure { margin: 0; display: grid; gap: 6px; align-content: start; }
 ol.steps img { width: 100%; max-width: 100%; height: auto; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); }
 ol.steps figcaption { font-size: .92rem; }
 ol.steps figcaption::before { content: counter(step) ". "; font: 700 .85rem var(--f-mono); color: var(--accent); }
@@ -95,10 +96,16 @@ ol.steps figcaption::before { content: counter(step) ". "; font: 700 .85rem var(
 .pic-label { font-size: .75rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
 .chip.same { border-color: var(--ok); color: var(--ok); justify-self: start; }
 .chip.changes { border-color: var(--mark); color: var(--mark); justify-self: start; }
-.frame { position: relative; display: block; line-height: 0; }
-.mark { position: absolute; border: 2px solid var(--mark); background: var(--mark-soft); border-radius: 3px;
-  box-shadow: 0 0 0 1px var(--mark-halo); pointer-events: none; }
-:root.marks-off .mark { display: none; }
+.frame { position: relative; display: block; line-height: 0; padding-left: 10px; }
+.frame img { display: block; }
+/* A change is ringed just OUTSIDE its pixels (outline-offset), never tinted: what changed stays
+   readable however small it is. A tick in the left gutter finds a small one at a glance. */
+.mark { position: absolute; outline: 2px solid var(--mark); outline-offset: 3px; border-radius: 2px;
+  pointer-events: none; }
+.mark.moved { outline: 1px dashed var(--muted); outline-offset: 2px; }
+.tick { position: absolute; left: 0; width: 5px; min-height: 6px; background: var(--mark); border-radius: 2px;
+  pointer-events: none; }
+:root.marks-off .mark, :root.marks-off .tick { display: none; }
 .strip-row { display: flex; gap: 10px; align-items: center; }
 .strip-row ol { flex: 1 1 auto; min-width: 0; overflow-x: auto; }
 button.marks { flex: 0 0 auto; min-height: 40px; padding: 0 12px; border-radius: 8px; font: 700 .85rem var(--f-body);
@@ -216,10 +223,17 @@ section.summary { background: var(--surface); border: 1px solid var(--line); bor
           var a = el("a", { href: url, target: "_blank", rel: "noopener", "class": "frame" });
           a.appendChild(el("img", { src: url, alt: (label ? label + ": " : "") + s.caption, loading: "lazy" }));
           (boxes || []).forEach(function (b) {
-            var m = el("span", { "class": "mark", "aria-hidden": "true" });
-            m.style.left = (b[0] * 100) + "%"; m.style.top = (b[1] * 100) + "%";
-            m.style.width = ((b[2] - b[0]) * 100) + "%"; m.style.height = ((b[3] - b[1]) * 100) + "%";
+            // The picture starts 10px in (the gutter), so a box is placed within calc(100% - 10px).
+            var moved = b[4] === "moved";
+            var m = el("span", { "class": moved ? "mark moved" : "mark", "aria-hidden": "true" });
+            m.style.left = "calc(10px + (100% - 10px) * " + b[0] + ")";
+            m.style.width = "calc((100% - 10px) * " + (b[2] - b[0]) + ")";
+            m.style.top = (b[1] * 100) + "%"; m.style.height = ((b[3] - b[1]) * 100) + "%";
             a.appendChild(m);
+            if (moved) return;               // a move is not a change: no gutter tick
+            var t = el("span", { "class": "tick", "aria-hidden": "true" });
+            t.style.top = (b[1] * 100) + "%"; t.style.height = ((b[3] - b[1]) * 100) + "%";
+            a.appendChild(t);
           });
           box.appendChild(a);
           return box;
@@ -235,7 +249,12 @@ section.summary { background: var(--surface); border: 1px solid var(--line); bor
           fig.appendChild(el("p", { "class": "muted" }, "Picture uploading…"));
         }
         if (s.same) fig.appendChild(el("span", { "class": "chip same" }, "no visible change"));
-        if (s.changes) fig.appendChild(el("span", { "class": "chip changes" }, s.changes + (s.changes === 1 ? " change" : " changes") + " marked"));
+        if (s.changes || s.moved) {
+          var said = [];
+          if (s.changes) said.push(s.changes + (s.changes === 1 ? " change" : " changes"));
+          if (s.moved) said.push(s.moved + " moved");
+          fig.appendChild(el("span", { "class": "chip changes" }, said.join(", ")));
+        }
         if (s["new"]) fig.appendChild(el("span", { "class": "chip shape" }, "new"));
         fig.appendChild(el("figcaption", null, s.caption));
         li.appendChild(fig); ol.appendChild(li);
