@@ -48,6 +48,7 @@ Walk the surface against each item, using real data shapes: empty / one / many, 
 | 12 | **Is it built from the ONE origin?** The capability exists once; this surface is a carrier, not a copy. | a fourth hand-rolled send screen |
 | 13 | **Is the arithmetic honest?** Totals reconcile exactly; a remainder is shown, never dropped. | an explanation £90 short of the difference |
 | 14 | **What happens next time?** The next visit, the next record, the chain. | no link between this period and the last |
+| 15 | **Is there another way to do this job?** One route per job: a second entry point to the same act is a finding. A fork is fine only where the work genuinely differs, asked as one question INSIDE the route; shortcuts (search, hub lists, links) lead to the route, never to a copy of it. | a paper uploaded to sit filed AND dropped at the point of recording: two routes, and the bugs live in the seam |
 
 ## §3 The output
 
