@@ -87,6 +87,15 @@ ol.steps img { width: 100%; max-width: 100%; height: auto; border: 1px solid var
 ol.steps figcaption { font-size: .92rem; }
 ol.steps figcaption::before { content: counter(step) ". "; font: 700 .85rem var(--f-mono); color: var(--accent); }
 .stopped figcaption { color: var(--bad); font-weight: 700; }
+.pair { display: grid; gap: 8px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.pic { display: grid; gap: 4px; min-width: 0; }
+.pic-label { font-size: .75rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.chip.same { border-color: var(--ok); color: var(--ok); justify-self: start; }
+details.found { border-top: 1px solid var(--line); padding-top: 8px; }
+details.found summary { cursor: pointer; font-weight: 700; font-size: .92rem; }
+details.found ul { margin: 8px 0 0; padding-left: 20px; display: grid; gap: 6px; }
+.chip.sev-major { border-color: var(--bad); color: var(--bad); }
+.chip.sev-moderate { border-color: var(--recheck); color: var(--recheck); }
 
 .verdict { border-top: 1px solid var(--line); padding-top: 10px; display: grid; gap: 4px; }
 .verdict .pill { justify-self: start; background: var(--st-soft, var(--accent-soft)); color: var(--st, var(--muted)); }
@@ -186,17 +195,43 @@ section.summary { background: var(--surface); border: 1px solid var(--line); bor
       shots.forEach(function (s) {
         var li = el("li", s.stopped ? { "class": "stopped" } : null);
         var fig = el("figure");
-        if (s.url) {
-          var a = el("a", { href: s.url, target: "_blank", rel: "noopener" });
-          a.appendChild(el("img", { src: s.url, alt: s.caption, loading: "lazy" }));
-          fig.appendChild(a);
-        } else {
+        function picture(url, label) {
+          var box = el("div", { "class": "pic" });
+          if (label) box.appendChild(el("span", { "class": "pic-label" }, label));
+          var a = el("a", { href: url, target: "_blank", rel: "noopener" });
+          a.appendChild(el("img", { src: url, alt: (label ? label + ": " : "") + s.caption, loading: "lazy" }));
+          box.appendChild(a);
+          return box;
+        }
+        if (s.url && s.before_url) {
+          var pair = el("div", { "class": "pair" });
+          pair.appendChild(picture(s.before_url, "Before"));
+          pair.appendChild(picture(s.url, "After"));
+          fig.appendChild(pair);
+        } else if (s.url) {
+          fig.appendChild(picture(s.url, null));
+        } else if (!s.stopped) {
           fig.appendChild(el("p", { "class": "muted" }, "Picture uploading…"));
         }
+        if (s.same) fig.appendChild(el("span", { "class": "chip same" }, "no visible change"));
+        if (s["new"]) fig.appendChild(el("span", { "class": "chip shape" }, "new"));
         fig.appendChild(el("figcaption", null, s.caption));
         li.appendChild(fig); ol.appendChild(li);
       });
       art.appendChild(ol);
+    }
+    if ((c.findings || []).length) {
+      var fd = el("details", { "class": "found" });
+      fd.appendChild(el("summary", null, "What the build's review found (" + c.findings.length + ")"));
+      var fl = el("ul");
+      c.findings.forEach(function (f) {
+        var li = el("li");
+        li.appendChild(el("span", { "class": "chip sev-" + f.severity }, f.severity + " · " + f.outcome));
+        li.appendChild(document.createTextNode(" " + (f.what || "")));
+        fl.appendChild(li);
+      });
+      fd.appendChild(fl);
+      art.appendChild(fd);
     }
     var n = notes[c.n] || {};
     var v = el("div", { "class": "verdict" });

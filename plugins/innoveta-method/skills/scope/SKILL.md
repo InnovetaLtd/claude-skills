@@ -117,7 +117,9 @@ that never saw the chat. Sections, in this order:
 8. **Slices.** Vertical, each demoable alone (`to-tickets`' rules): the scenarios it makes true, what blocks it,
    the files it may touch, its activator. **Slice 0 is always "scenarios"**, and blocks every other slice:
    - it registers each scenario as a seed setup on every screen it lists (`<screen>` + `S<n>-<slug>`, the app's
-     ONE seed command), so surface review, the layout lint and the walkthrough walk Ben's examples;
+     ONE seed command), and as a **flow** on the screen where its *Sees* line shows (`[[screen.flow]]`: the setup,
+     the steps from its *Does* line, `sees` = its *Sees* line), so the build walks its own pictures, the reviewer
+     judges them and the walkthrough shows them to Ben (standard §4, *Flows*);
    - it writes one test per scenario at the cheapest seam that proves it, against the interfaces the build
      actually chose, each marked **expected to fail** and naming its scenario (`S3`) and scope doc;
    - the marker is the ratchet: when a later slice makes a scenario true, the suite goes red until the marker

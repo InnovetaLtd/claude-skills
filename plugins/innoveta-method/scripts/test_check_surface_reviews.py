@@ -115,6 +115,50 @@ class GateTests(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn('templates/legacy.html changed but is not registered', out)
 
+    def append(self, block):
+        path = self.app / 'records' / 'orders.md'
+        raw = path.read_text()
+        path.write_text(raw.replace('+++\n# prose', block + '+++\n# prose', 1))
+
+    def test_a_walkthrough_entry_never_dates_the_screen_and_its_findings_say_what_should_have_caught_them(self):
+        self.record()
+        self.append('\n[[entry]]\nkind = "walkthrough"\ndate = "2026-11-08"\n'
+                    '[[entry.finding]]\nid = "w1"\nseverity = "moderate"\noutcome = "open"\n'
+                    'caught_by = "review"\ndoc = "docs/reviews/2026-11-08-walkthrough.md"\nwhat = "w"\n'
+                    '[[entry.finding]]\nid = "w2"\nseverity = "minor"\noutcome = "parked"\nreason = "later"\n'
+                    'caught_by = "taste"\n')
+        self.assertEqual(self.run_gate()[0], 0)       # the review still dates the screen
+        self.append('[[entry.finding]]\nid = "w3"\nseverity = "minor"\noutcome = "open"\n'
+                    '[[entry.finding]]\nid = "w4"\nseverity = "minor"\noutcome = "fixed"\ncaught_by = "luck"\n')
+        code, out = self.run_gate()
+        self.assertEqual(code, 1)
+        self.assertIn('orders finding w3: a walkthrough finding says which layer should have caught it', out)
+        self.assertIn('orders finding w3: an open finding names the walkthrough doc', out)
+        self.assertIn('orders finding w4: caught_by is one of', out)
+
+    def test_open_and_parked_belong_to_a_walkthrough_and_kinds_are_known(self):
+        self.record(findings='[[entry.finding]]\nid = "1"\nseverity = "minor"\noutcome = "open"\ndoc = "d"\n')
+        self.append('\n[[entry]]\nkind = "chat"\n')
+        code, out = self.run_gate()
+        self.assertEqual(code, 1)
+        self.assertIn('orders finding 1: has no outcome; end it as fixed, waived, ben, ruled (SR12)', out)
+        self.assertIn("orders: an entry's kind must be one of review, na, walkthrough", out)
+
+    def test_a_flow_names_a_known_setup_says_what_it_shows_and_uses_the_recorder_verbs(self):
+        self.record()
+        (self.app / 'screens.toml').write_text(SCREEN + (
+            '[[screen.flow]]\nname = "S22"\nsetup = "typical"\nsees = "Acknowledge is refused"\n'
+            'steps = [{goto = "/orders/1/", shot = "the order"}, {click = "text=Open"}, {shot = "the draft"}]\n'
+            '[[screen.flow]]\nname = "bad"\nsetup = "busy"\n'
+            'steps = [{teleport = "x"}, {click = "a", fill = ["b", "c"]}]\n'))
+        code, out = self.run_gate()
+        self.assertEqual(code, 1)
+        self.assertNotIn('orders flow S22', out)
+        self.assertIn("orders flow bad: its setup 'busy' is not one of the screen's setups", out)
+        self.assertIn('orders flow bad: says nothing it should show', out)
+        self.assertIn('orders flow bad step 1: one of', out)
+        self.assertIn('orders flow bad step 2: one of', out)
+
     def test_the_lists_only_shrink_against_the_base(self):
         self.record()
         (self.app / 'records' / '_lint_baseline.json').write_text(json.dumps(['a']))
