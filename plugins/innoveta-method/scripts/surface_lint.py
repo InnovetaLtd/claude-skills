@@ -992,7 +992,10 @@ MEASURE_JS = r"""
     if (!visible(el) || !el.firstChild) continue;
     const range = document.createRange();
     range.selectNodeContents(el);
-    const rects = [...range.getClientRects()].filter(r => r.width > 0.5 && r.height > 0.5)
+    // A rect of 1px or less is a clipped visually-hidden span (screen-reader text such as
+    // " - opens a form"), not a line of label: it sits 1-2px above the text and sorted first it
+    // read as a second line (EGB build overview, 2026-11-09).
+    const rects = [...range.getClientRects()].filter(r => r.width > 1.5 && r.height > 1.5)
         .sort((a, b) => a.top - b.top);
     let lines = 0, bottom = -Infinity;
     for (const r of rects) {
